@@ -1,1 +1,1 @@
-# Yapay-Zeka-Destekli-Ders-al-ma-Sistemi
+#Akıllı-Yapay-zeka-destekli-otonom-coder-F.R.I.D.A.Y
