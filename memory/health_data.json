@@ -1,0 +1,23 @@
+{
+  "data": {
+    "heart_rate": 75,
+    "resting_hr": 62,
+    "hrv": 58.5,
+    "blood_oxygen": 98.0,
+    "respiratory_rate": 14.5,
+    "steps": 6500,
+    "calories": 320,
+    "basal_calories": 1800,
+    "exercise_min": 45,
+    "stand_hours": 10,
+    "stand_min": 120,
+    "flights_climbed": 5,
+    "walking_distance_km": 4.2,
+    "walking_speed": 4.5,
+    "walking_step_length_cm": 72,
+    "headphone_audio_db": 65,
+    "environment_audio_db": 50,
+    "daylight_min": 60,
+    "sleep_hours": 7.2
+  }
+}

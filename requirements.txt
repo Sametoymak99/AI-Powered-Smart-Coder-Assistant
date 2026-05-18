@@ -1,0 +1,20 @@
+# F.R.I.D.A.Y Windows — Gerekli paketler
+google-genai
+SpeechRecognition
+sounddevice
+psutil
+Pillow
+requests
+# winsdk  # Python 3.14 ile uyumsuz — wpndatabase.db yöntemi kullanılıyor
+opencv-python
+pyautogui
+pyserial
+send2trash
+pycaw
+comtypes
+screen-brightness-control
+pytest
+yfinance
+pandas
+ta
+
