@@ -1173,7 +1173,7 @@ class JarvisUI:
         dialog.resizable(False, False)
         
         # Ekranın tam ortasına yerleştir (Breathing room için genişlik ve yüksekliği artırdık)
-        dialog_w, dialog_h = 440, 245
+        dialog_w, dialog_h = 440, 285
         rx = self.root.winfo_rootx() + (self.W - dialog_w) // 2
         ry = self.root.winfo_rooty() + (self.H - dialog_h) // 2
         dialog.geometry(f"{dialog_w}x{dialog_h}+{rx}+{ry}")
@@ -1193,8 +1193,8 @@ class JarvisUI:
                              fg=C_PRI, bg=C_BG, font=font_body_bold(12))
         title_lbl.pack(anchor="w", pady=(0, 6))
         
-        desc_text = ("Geliştirilmesini istediğiniz görevi yazın. Kodlar 'generated_project.py' "
-                     "dosyasına yazılacak, otomatik çalıştırılacak ve hatalar kendi kendine düzeltilecektir.")
+        desc_text = ("Geliştirilmesini istediğiniz görevi yazın. Kodlar belirttiğiniz "
+                     "dosyaya yazılacak, otomatik çalıştırılacak ve hatalar düzeltilecektir.")
         desc_lbl = tk.Label(content, text=desc_text, fg=C_MUTED, bg=C_BG, 
                             font=font_body(9), justify="left", wraplength=390)
         desc_lbl.pack(anchor="w", pady=(0, 10))
@@ -1226,7 +1226,17 @@ class JarvisUI:
                               font=font_body_bold(8), justify="left")
         status_lbl.pack(anchor="w", pady=(0, 12))
         
-        # Metin giriş alanı (Kullanıcının yazdığı yazının net gözükmesi için yüksek kontrast ve dikey nefes alma alanı (ipady=8) eklendi)
+        # Dosya adı alanı
+        file_frame = tk.Frame(content, bg=C_BG)
+        file_frame.pack(fill="x", pady=(0, 8))
+        tk.Label(file_frame, text="Proje Dosyası:", fg=C_MID, bg=C_BG, font=font_body(9)).pack(side="left")
+        filename_var = tk.StringVar(value="generated_project.py")
+        file_entry = tk.Entry(file_frame, textvariable=filename_var, fg="#ffffff", bg="#1e293b",
+                              insertbackground="#ffffff", borderwidth=0, font=font_body(10),
+                              highlightthickness=1, highlightbackground="#334155", highlightcolor=C_PRI, width=22)
+        file_entry.pack(side="left", padx=10, ipady=4)
+
+        # Metin giriş alanı (Görev)
         task_var = tk.StringVar()
         entry = tk.Entry(content, textvariable=task_var, fg="#ffffff", bg="#1e293b",
                          insertbackground="#ffffff", borderwidth=0, font=font_body(11),
@@ -1243,15 +1253,16 @@ class JarvisUI:
             
         def _start():
             task = task_var.get().strip()
+            filepath = filename_var.get().strip()
             if not task:
                 return
             dialog.destroy()
             
             def _work():
-                self.write_log(f"SYS: '{task}' için otonom kodlama başlatıldı. Lütfen bekleyin...")
+                self.write_log(f"SYS: '{task}' görevi için ({filepath}) otonom kodlama başlatıldı. Lütfen bekleyin...")
                 try:
                     from autonomous_coder import generate_and_run_code
-                    res = generate_and_run_code(task)
+                    res = generate_and_run_code(task, filepath=filepath)
                     self.write_log(res)
                     self.play_success_sfx()
                 except Exception as e:

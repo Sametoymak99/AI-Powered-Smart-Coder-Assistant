@@ -131,6 +131,7 @@ ARAÇLAR (YENİ):
 - execute_task_plan: Oluşturulan planı çalıştır
 - get_active_plan: Aktif planın durumunu göster
 - cancel_task: Aktif planı iptal et
+- game_helper: Oyun başlatır, auto-clicker/makro çalıştırır, nişangah (crosshair) açıp/kapatır.
 
 ÖRNEK KONUŞMALAR (YENİ):
 - "Masaüstümdeki dosyaları listele" → file_manager(action="list", path="masaüstü")
@@ -149,6 +150,16 @@ ARAÇLAR (YENİ):
         {description: "PDF'leri arşivle", tool: "file_manager", action: "compress", args: {paths: ["<yol>"]}},
         {description: "Orijinal PDF'leri sil", tool: "file_manager", action: "delete", args: {path: "<dosya>", permanent: false}}
     ])
+- "Steam'den Witcher 3 oyununu aç/başlat" → game_helper(action="launch_game", game_name="Witcher 3")
+- "Bana 10 saniye boyunca saniyede 15 tık vuran auto clicker aç" → game_helper(action="auto_click", cps=15, duration=10)
+- "Ekrana kırmızı artı şeklinde nişangah koy/kapat" → game_helper(action="toggle_crosshair", color="red", size=12, style="cross")
+- "5 saniye boyunca fareyi basılı tut" → game_helper(action="hold_click", button="left", duration=5)
+- "W tuşuna 10 saniye basılı tut" → game_helper(action="hold_key", key="w", duration=10)
+- "q, w, e tuş kombo dizisini 1 saniye arayla bas" → game_helper(action="press_sequence", sequence="q,w,e", delay=1.0)
+- "Witcher 3 oyununu güçlendir / game booster çalıştır" → game_helper(action="boost_game", game_name="Witcher3")
+- "Sistem önceliklerini normale döndür" → game_helper(action="restore_priorities")
+- "Benim yerime ateş et / triggerbot aç (45 saniye)" → game_helper(action="triggerbot", duration=45)
+- "Oyunda AFK kalmamı engelle / anti afk aç (15 dakika)" → game_helper(action="anti_afk", duration=15)
 
 SİSTEM VE ZAMAN YÖNETİMİ:
 - "Sesi 50 yap", "Sesi kıs" → set_volume(level=50)

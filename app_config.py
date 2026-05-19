@@ -23,6 +23,7 @@ DEFAULT_CONFIG = {
     "email_smtp_port": 587,
     "email_imap_host": "",
     "email_imap_port": 993,
+    "coder_backend": "ollama",
 }
 
 

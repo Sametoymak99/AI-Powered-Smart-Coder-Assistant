@@ -50,6 +50,8 @@ from actions.task_planner import (
     create_plan, get_active_plan, cancel_plan, execute_plan, set_progress_callback
 )
 from actions.github_manager import push_to_github
+from autonomous_coder import generate_and_run_code
+from actions.game_helper import game_helper_control
 from actions.sys_control import set_volume, set_brightness
 from actions.alarms_timers import set_timer, set_alarm
 
@@ -1010,6 +1012,147 @@ TOOL_DECLARATIONS = [
                 }
             }
         }
+    },
+    {
+        "name": "create_autonomous_project",
+        "description": "Kullanıcının sesli veya yazılı olarak istediği bir yazılım projesini, uygulamayı veya scripti Otonom Coder modülü ile sıfırdan oluşturur veya mevcut projeyi düzenler. Sonrasında Github'a yükler.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "task": {
+                    "type": "STRING",
+                    "description": "Kullanıcının geliştirmek veya düzenlemek istediği projenin görev açıklaması."
+                },
+                "filename": {
+                    "type": "STRING",
+                    "description": "Projenin kaydedileceği dosya adı (Örn: yilan_oyunu.py, hesap_makinesi.py). Kullanıcı belirtmediyse mantıklı bir isim uydur. .py ile bitmeli."
+                }
+            },
+            "required": ["task", "filename"]
+        }
+    },
+    {
+        "name": "game_helper",
+        "description": (
+            "Oyun asistanı. Kullanıcı oyun başlatmak, triggerbot, aim assist, anti-recoil, "
+            "rapid fire, bunny hop, auto-clicker, nisanğah (crosshair overlay), "
+            "renk kalibrasyonu, game booster veya anti-afk istediğinde kullan. "
+            "Triggerbot: imlecinle nerede olursan ol, ekranda düşman rengi görününce otomatik ateş eder. "
+            "Aim Assist: düşman rengini bulup fareyi hedefe kaydırır. "
+            "Anti-Recoil: ateş ederken fareyi aşağı kaydırarak geri tepmeyi dengeler. "
+            "Rapid Fire: sol tık basılıyken hızlı ateş makrosu. "
+            "Bunny Hop: zıplama tuşunu tam zamanlamayla otomatik tetikler."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action": {
+                    "type": "STRING",
+                    "description": (
+                        "Yapılacak işlem: "
+                        "launch_game | list_games | "
+                        "auto_click | hold_click | hold_key | press_sequence | "
+                        "toggle_crosshair | boost_game | restore_priorities | "
+                        "triggerbot | aim_assist | recoil_control | "
+                        "rapid_fire | bunny_hop | color_calibrate | anti_afk"
+                    )
+                },
+                "game_name": {
+                    "type": "STRING",
+                    "description": "Açılacak veya güçlendirilecek oyunun adı (örn: 'Witcher 3', 'csgo')."
+                },
+                "game": {
+                    "type": "STRING",
+                    "description": (
+                        "Triggerbot/Aim Assist için oyun önayarı (düşman rengi). "
+                        "Değerler: cs2 | valorant | apex | pubg | fortnite | red | yellow | white | any | custom. "
+                        "Kullanıcı oyun belirtirse o oyunun adını kullan (cs2, valorant vb). "
+                        "custom: color_calibrate ile oluşturulan renk."
+                    )
+                },
+                "duration": {
+                    "type": "NUMBER",
+                    "description": "Süre (saniye). Triggerbot, aim_assist, recoil_control, rapid_fire, bunny_hop, anti_afk için. Anti_afk: dakika cinsinden."
+                },
+                "scan_zone": {
+                    "type": "INTEGER",
+                    "description": "Triggerbot/Aim Assist için ekran merkezinden taranacak yarıçap (piksel). Varsayılan: 400."
+                },
+                "fire_delay": {
+                    "type": "NUMBER",
+                    "description": "Triggerbot: tespit ile tıklama arasındaki gecikme (saniye). Varsayılan: 0.03"
+                },
+                "cooldown": {
+                    "type": "NUMBER",
+                    "description": "Triggerbot: ardışık atışlar arasındaki minimum bekleme süresi (saniye). Varsayılan: 0.08"
+                },
+                "full_screen": {
+                    "type": "BOOLEAN",
+                    "description": "Triggerbot: True ise tüm ekranı tara, False ise sadece merkez alanı. Varsayılan: False"
+                },
+                "smooth": {
+                    "type": "NUMBER",
+                    "description": "Aim Assist: fare hareket hızı (0.1=hızlı snap, 0.5=yumuşak kayma). Varsayılan: 0.3"
+                },
+                "fov": {
+                    "type": "INTEGER",
+                    "description": "Aim Assist: kaç piksel içindeki hedeflere tepki verilsin (merkezden uzaklık). Varsayılan: 150"
+                },
+                "recoil_y": {
+                    "type": "INTEGER",
+                    "description": "Anti-Recoil: her frame'de fareyi kaç piksel aşağı kaydır (geri tepme dengeleme). CS2 AK için 4-6, M4 için 2-3. Varsayılan: 5"
+                },
+                "recoil_x": {
+                    "type": "INTEGER",
+                    "description": "Anti-Recoil: yatay dengeleme miktarı (piksel). Çoğu oyun için 0. Varsayılan: 0"
+                },
+                "fire_key": {
+                    "type": "STRING",
+                    "description": "Anti-Recoil: hangi tuşa basılıyken aktif olsun. 'mouse1' (sol tık) veya 'mouse2' (sağ tık). Varsayılan: mouse1"
+                },
+                "cps": {
+                    "type": "INTEGER",
+                    "description": "Saniyede tıklama sayısı. auto_click veya rapid_fire için. Rapid Fire için 15-25 önerilir."
+                },
+                "jump_key": {
+                    "type": "STRING",
+                    "description": "Bunny Hop: zıplama tuşu. Varsayılan: space"
+                },
+                "radius": {
+                    "type": "INTEGER",
+                    "description": "color_calibrate: örnekleme yarıçapı (piksel). Varsayılan: 5"
+                },
+                "button": {
+                    "type": "STRING",
+                    "description": "Fare tuşu: 'left' (sol), 'right' (sağ), 'middle' (orta) - hold_click için."
+                },
+                "key": {
+                    "type": "STRING",
+                    "description": "Klavyede basılı tutulacak tuş (örn: 'w', 'shift', 'space') - hold_key için."
+                },
+                "sequence": {
+                    "type": "STRING",
+                    "description": "Virgülle ayrılmış tuş basma dizisi (örn: 'q,w,e,r' veya skill kombosu) - press_sequence için."
+                },
+                "delay": {
+                    "type": "NUMBER",
+                    "description": "Tuş dizisi basımları arasındaki gecikme (saniye) - press_sequence için."
+                },
+                "color": {
+                    "type": "STRING",
+                    "description": "Nişangah rengi (varsayılan: red) - toggle_crosshair için."
+                },
+                "size": {
+                    "type": "INTEGER",
+                    "description": "Nişangah piksel boyutu (varsayılan: 12) - toggle_crosshair için."
+                },
+                "style": {
+                    "type": "STRING",
+                    "description": "Nişangah stili: 'dot' (nokta), 'cross' (artı +), 'circle' (çember), 't_shape' (T şekli) - toggle_crosshair için."
+                }
+            },
+            "required": ["action"]
+        }
     }
 ]
 
@@ -1074,15 +1217,24 @@ class WebHUDRequestHandler(http.server.BaseHTTPRequestHandler):
                     "ram": 0.0,
                     "battery": 100.0
                 },
+                "game_status": {
+                    "crosshair_active": False,
+                    "boosted_game": None
+                },
                 "recent_logs": []
             }
             
             if ui:
                 from actions.camera_vision import is_sentinel_active, is_gesture_active
+                from actions.game_helper import get_game_helper_status
                 status["sentinel_active"] = is_sentinel_active()
                 status["gesture_active"] = is_gesture_active()
                 status["user_emotion"] = getattr(ui, "user_emotion", "calm")
                 status["sys_stats"] = getattr(ui, "_stats", status["sys_stats"])
+                try:
+                    status["game_status"] = get_game_helper_status()
+                except Exception:
+                    pass
                 
                 try:
                     logs_txt = ui.log_text.get("1.0", "end").strip().split("\n")
@@ -2110,6 +2262,39 @@ class JarvisLive:
                 r = await loop.run_in_executor(
                     None,
                     lambda: push_to_github(args.get("commit_message", "Jarvis tarafından otomatik güncellendi"))
+                )
+                result = r
+
+            elif name == "create_autonomous_project":
+                task_desc = args.get("task", "")
+                filepath = args.get("filename", "generated_project.py")
+                if self.ui:
+                    self.ui.write_log(f"SYS: '{task_desc}' görevi ({filepath}) için otonom kodlama başlıyor...")
+                r = await loop.run_in_executor(
+                    None,
+                    lambda: generate_and_run_code(task_desc, filepath=filepath)
+                )
+                result = r
+
+            elif name == "game_helper":
+                action = args.get("action", "")
+                if self.ui:
+                    self.ui.write_log(f"SYS: Oyun asistanı aksiyonu tetiklendi: {action}")
+                r = await loop.run_in_executor(
+                    None,
+                    lambda: game_helper_control(
+                        action=action,
+                        game_name=args.get("game_name", ""),
+                        cps=args.get("cps", 10),
+                        duration=args.get("duration", 5.0),
+                        button=args.get("button", "left"),
+                        key=args.get("key", ""),
+                        sequence=args.get("sequence", ""),
+                        delay=args.get("delay", 0.5),
+                        color=args.get("color", "red"),
+                        size=args.get("size", 12),
+                        style=args.get("style", "dot")
+                    )
                 )
                 result = r
 

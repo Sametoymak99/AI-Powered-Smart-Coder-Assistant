@@ -1,45 +1,203 @@
-# F.R.I.D.A.Y. Görev ve Özellikleri
+# 🤖 F.R.I.D.A.Y. — Yapay Zeka Asistanı Yetenek Rehberi
 
-## 1. Sistem ve Zaman Yönetimi 💻🕒
-- **Ses Kontrolü:** `set_volume` (Sesi ayarlar, artırır, kısar) 🔊
-- **Parlaklık Kontrolü:** `set_brightness` (Ekran parlaklığını ayarlar) 💡
-- **Zamanlayıcı:** `set_timer` (Geri sayım sayacı kurar) ⏳
-- **Alarm:** `set_alarm` (Belirli bir saat için alarm kurar) ⏰
-- **Sistem Bilgisi:** `sys_info` (Pil, CPU, RAM, disk, saat, tarih, ağ durumu) 📊
+> **F**emale **R**eplacement **I**ntelligent **D**igital **A**ssistant **Y**outh  
+> Geliştirici: Samet Oymak | Versiyon: 2026 Pro
 
-## 2. İletişim ve Organizasyon 💬📅
-- **WhatsApp Mesaj:** `send_whatsapp_message` (Mesaj gönderir veya taslak oluşturur) 📱
-- **WhatsApp Kişi Kaydet:** `save_whatsapp_contact` (Rehbere kişi ekler) 👤
-- **E-posta Gönder:** `send_email` (SMTP üzerinden e-posta gönderir) 📧
-- **E-posta Oku:** `read_emails` (Gelen kutusunu okur) 📨
-- **Takvim Yönetimi:** `get_calendar_events`, `add_calendar_event`, `delete_calendar_event` (Takvim etkinliklerini yönetir) 🗓️
-- **Anımsatıcılar:** `get_reminders`, `add_reminder` (Anımsatıcı listelerini yönetir) ✅
-- **Bildirimler:** `read_notifications`, `get_notification_summary` (Windows bildirimlerini okur ve özetler) 🔔
+---
 
-## 3. Dosya ve Kod Yönetimi 🗃️🐍
-- **Dosya Yönetimi:** `file_manager` (Listeleme, arama, kopyalama, taşıma, silme, arşivleme, büyük/yinelenen dosya bulma) 📂
-- **Dosya Okuma/Yazma:** `read_file`, `write_file` 📝
-- **Kod Düzenleme:** `replace_code` (Kod bloklarını değiştirir) ✏️
-- **Kod Çalıştırma:** `execute_code`, `run_tests` (Python kodu çalıştırır ve test eder) ▶️
-- **Powershell:** `shell_run` (Windows PowerShell komutlarını çalıştırır) 💻
+## 1. 🖥️ Sistem & Donanım Kontrolü
 
-## 4. Multimedya ve Web 🌐🎧
-- **Tarayıcı Kontrolü:** `browser_control` (URL açar, Google'da arar, YouTube'da oynatır) 🔎
-- **Medya Oynatma:** `play_media` (Spotify, Apple Music, YouTube üzerinde içerik çalar) 🎶
-- **YouTube Analiz:** `get_youtube_channel_report` (Kanal istatistiklerini raporlar) 📈
+| Özellik | Komut / Fonksiyon | Açıklama |
+|---|---|---|
+| Ses Kontrolü | `set_volume` | Sesi ayarla, artır veya kıs |
+| Parlaklık | `set_brightness` | Ekran parlaklığını değiştir |
+| Sistem Bilgisi | `sys_info` | CPU, RAM, disk, pil, ağ, saat/tarih |
+| PowerShell | `shell_run` | Windows komutlarını çalıştır |
+| Sistem Kapatma | `sys_control` | Kapat / Yeniden başlat / Uyku |
+| Akıllı Ev (Arduino) | `send_arduino_command` | Işık, röle, sensör kontrolü |
+| Tablet Kontrolü | `tablet_control` | Bağlı tablet komutları |
 
-## 5. Yapay Zeka ve Otomasyon 🤖✨
-- **Ekran Analizi:** `analyze_screen` (Aktif pencereyi analiz eder, metin okur, hata ayıklar) 🖥️
-- **Kamera Analizi:** `analyze_camera` (Kameradan görüntü alır, nesne tanır, hacim/düzlük ölçer, plaka kaydeder) 📸
-- **Ekran Etkileşimi:** `click_on_screen` (Ekranda belirli öğelere tıklar) 👆
-- **Akıllı Ev (Arduino):** `send_arduino_command` (Işık, sıcaklık vb. kontrolü) 🏠
-- **Kalıcı Hafıza:** `save_memory`, `delete_memory` (Kullanıcı tercihlerini ve önemli bilgileri kaydeder) 🧠
+---
 
-## 6. Protokoller 🛡️🔄
-- **Sabah Protokolü:** `sabah_protokolu` (Günlük brifing, sistem sağlığı ve hava durumu) ☀️
-- **Nöbetçi Modu:** `toggle_sentinel_mode` (Güvenlik modunu açar/kapatır) 🚨
-- **Jest Kontrolü:** `toggle_gesture_control` (El hareketleriyle medya kontrolü) ✋
-- **Yüz Kaydetme:** `yuz_kaydet` (Kullanıcı yüzünü kaydeder) 🙂
-- **Ben Çıkıyorum:** `ben_cikiyorum` (Otomatik çıkış protokolü) 🚶
-- **Ben Geldim:** `ben_geldim` (Otomatik dönüş protokolü) 🏠
-- **Görev Planlama:** `create_task_plan`, `execute_task_plan`, `cancel_task` (Karmaşık görevleri planlar ve yürütür) 📋
+## 2. 💬 İletişim & Organizasyon
+
+| Özellik | Komut / Fonksiyon | Açıklama |
+|---|---|---|
+| WhatsApp Mesaj | `send_whatsapp_message` | Mesaj gönder veya taslak oluştur |
+| WhatsApp Kişi | `save_whatsapp_contact` | Rehbere yeni kişi ekle |
+| E-posta Gönder | `send_email` | SMTP üzerinden e-posta gönder |
+| E-posta Oku | `read_emails` | Gelen kutusunu listele ve oku |
+| Takvim Yönetimi | `get/add/delete_calendar_event` | Google Takvim entegrasyonu |
+| Anımsatıcılar | `get/add_reminder` | Anımsatıcı oluştur ve listele |
+| Bildirimler | `read_notifications` | Windows bildirimlerini oku ve özetle |
+| Namaz Vakitleri | `namaz_vakti_arayan` | İstanbul namaz vakitlerini getir |
+
+---
+
+## 3. 📂 Dosya & Kod Yönetimi
+
+| Özellik | Komut / Fonksiyon | Açıklama |
+|---|---|---|
+| Dosya Yöneticisi | `file_manager` | Listele, ara, kopyala, taşı, sil, arşivle |
+| Dosya Oku/Yaz | `read_file` / `write_file` | Metin dosyası işlemleri |
+| Kod Düzenleme | `replace_code` | Belirli kod bloğunu değiştir |
+| Kod Çalıştırma | `execute_code` | Python kodu doğrudan çalıştır |
+| Test Koştur | `run_tests` | Birim testlerini otomatik çalıştır |
+| GitHub Yönetimi | `github_manager` | Push, branch oluştur, PR aç |
+| Büyük Dosya Bul | `file_manager` | Disk temizliği için büyük/yinelenen dosyalar |
+
+---
+
+## 4. 🌐 Multimedya & Web
+
+| Özellik | Komut / Fonksiyon | Açıklama |
+|---|---|---|
+| Tarayıcı Kontrolü | `browser_control` | URL aç, Google'da ara |
+| YouTube Oynat | `browser_control` | YouTube'da video veya müzik çal |
+| Spotify / Apple Music | `play_media` | Platform üzerinde içerik oynat |
+| YouTube Analiz | `get_youtube_channel_report` | Kanal istatistikleri ve rapor |
+| Hisse Danışmanı | `stock_advisor` | Borsa analizi ve hisse takibi |
+| DuckDuckGo Arama | `search_duckduckgo` | Otonom web araması (ajan içi) |
+| Wallpaper | `wallpaper_manager` | Masaüstü duvar kağıdını değiştir |
+
+---
+
+## 5. 🎮 Oyun Asistanı (Game Helper Pro)
+
+| Özellik | Komut / Fonksiyon | Açıklama |
+|---|---|---|
+| Steam Oyun Başlat | `launch_steam_game` | İsimden arayarak Steam oyunu başlat |
+| Auto-Clicker Makro | `auto_clicker` | Saniyede X tıklama makrosu |
+| Tuş Basılı Tut | `hold_key` | Klavye tuşunu süre boyunca tut |
+| Tuş Dizisi | `press_keys_sequence` | Kombo/skill dizisi çalıştır |
+| Fare Basılı Tut | `hold_click` | Sol/sağ tık basılı tut |
+| Nişangah Overlay | `toggle_crosshair` | Dot / Cross / Circle / T-Shape nişangah |
+| Game Booster | `boost_game_performance` | Oyuna High CPU önceliği ver |
+| **PRO Triggerbot** | `triggerbot_color_change` | numpy HSV renk tespiti ile otonom atış |
+| Anti-AFK Bot | `anti_afk_bot` | Sunucudan atılmayı önle |
+
+### 🎯 Triggerbot Oyun Önayarları
+`cs2` · `valorant` · `apex` · `pubg` · `fortnite` · `red` · `yellow` · `white` · `any`
+
+---
+
+## 6. 🧠 Yapay Zeka & Görü (Vision)
+
+| Özellik | Komut / Fonksiyon | Açıklama |
+|---|---|---|
+| Kamera Analizi | `analyze_camera` | Gemini AI ile kameradan nesne tanı |
+| Boyut/Hacim Tahmini | `analyze_camera` | Görüntüden boyut, alan, hacim hesapla |
+| Plaka Okuma (OCR) | `analyze_camera` | Araç plakasını kameradan oku |
+| Eğim Analizi | `analyze_camera` | Cismin düz/eğik olup olmadığını söyle |
+| Ekran Analizi | `analyze_screen` | Aktif pencereyi AI ile analiz et |
+| Ekran Tıklama | `click_on_screen` | AI ile belirli öğeye tıkla |
+| Yüz Kaydetme | `register_face` | Profil yüzünü sisteme kaydet |
+
+---
+
+## 7. 🛡️ Güvenlik & Nöbetçi Protokolü
+
+| Özellik | Komut / Fonksiyon | Açıklama |
+|---|---|---|
+| **Nöbetçi Modu** | `start_sentinel_mode` | Kamera ile hareket algıla |
+| Yüz Tanıma | Sentinel + Gemini AI | Samet mi, yabancı mı? otomatik karar |
+| Davetsiz Misafir Fotoğrafı | `security_captures/` | Hareket anında fotoğraf kaydet |
+| WhatsApp Alarm | Sentinel + WhatsApp | Yabancı tespitinde fotoğraflı uyarı gönder |
+| **Jest Kontrolü** | `start_gesture_control` | El hareketleriyle medya kontrolü |
+
+### 🤚 Desteklenen Jestler
+| Jest | Eylem |
+|---|---|
+| Sağa kaydır | ⏭ Sonraki şarkı |
+| Sola kaydır | ⏮ Önceki şarkı |
+| Yukarı kaydır | 🔊 Sesi artır (+10) |
+| Aşağı kaydır | 🔉 Sesi azalt (-10) |
+| Hareketsiz kal | ⏯ Duraklat / Devam |
+
+---
+
+## 8. ⚕️ Sağlık Takibi (iPhone Entegrasyonu)
+
+> iPhone'dan iCloud üzerinden **Health Auto Export** ile senkronize edilir.
+
+| Metrik | Açıklama |
+|---|---|
+| 💓 Nabız / Dinlenim Nabzı / HRV | Anlık ve ortalama kalp verileri |
+| 🩸 Kan Oksijeni (SpO2) | Yüzde değeriyle anlık ölçüm |
+| 👣 Adım Sayısı & Mesafe | Günlük yürüyüş verisi |
+| 🔥 Aktif & Bazal Kalori | Yakılan enerji miktarı |
+| 🏃 Egzersiz Süresi & Analizi | Antrenman penceresi ve yük yorumu |
+| 💤 Uyku Analizi | Uyku süresi, derin uyku, REM |
+| 🚀 Yürüme Hızı & Adım Uzunluğu | Mobilite metrikleri |
+| 🎧 Ses Maruziyeti | Çevresel & kulaklık dB değerleri |
+| 🌤 Gün Işığı Süresi | Günlük güneş maruziyeti |
+
+---
+
+## 9. 🤖 Otonom Kod Geliştirici
+
+> Sadece bir görev tanımla — F.R.I.D.A.Y. kodlar, test eder, GitHub'a gönderir!
+
+### Çalışma Akışı
+```
+1. 🔍 İnternet Araması  →  DuckDuckGo ile güncel döküman çek
+2. 💻 Geliştirici Ajan  →  Gemini 2.5 Flash veya Ollama ile kod üret
+3. 🔒 Güvenlik Taraması →  Bandit + Pylint statik analiz
+4. ▶️  Sandbox Çalıştır  →  İzole Python venv içinde test et
+5. 📦 Oto Paket Kurulum →  Eksik kütüphaneleri otomatik kur
+6. 🧪 Testçi Ajan       →  pytest ile otomatik test yaz ve koştur
+7. 🚀 GitHub PR          →  Branch aç, commit et, Pull Request oluştur
+```
+
+### Desteklenen Backend'ler
+- **Gemini 2.5 Flash** (varsayılan, bulut)
+- **Yerel Ollama** — `qwen`, `deepseek`, `llama`, `gemma` modelleri
+- **Oto Fallback** — API limiti aşılırsa Ollama'ya geç
+
+---
+
+## 10. 📋 Görev & Protokoller
+
+| Protokol | Komut | Açıklama |
+|---|---|---|
+| Sabah Protokolü | `sabah_protokolu` | Hava durumu, sağlık özeti, sistem sağlığı |
+| Ben Çıkıyorum | `ben_cikiyorum` | Ekranı kapat, güvenli bekle |
+| Ben Geldim | `ben_geldim` | Karşılama mesajı ve günlük brifing |
+| Görev Planlama | `create_task_plan` | Karmaşık görevleri adımlara böl |
+| Görev Yürütme | `execute_task_plan` | Planı otonom olarak uygula |
+| Görev İptal | `cancel_task` | Çalışan görevi durdur |
+
+---
+
+## 11. 🧠 Bellek & Kişiselleştirme
+
+| Özellik | Açıklama |
+|---|---|
+| `save_memory` | Kullanıcı tercihlerini ve önemli bilgileri kalıcı kaydet |
+| `delete_memory` | Kaydedilmiş bir bilgiyi sil |
+| Ses Kimlik Doğrulama | `voice_auth` — Sesle giriş |
+| Klap Başlatıcı | `clap_launcher` — El çırpmayla uygulama aç |
+| Alarm & Zamanlayıcı | `set_alarm` / `set_timer` — Ses bildirimli |
+| Hava Durumu | `get_weather` — Anlık hava bilgisi |
+
+---
+
+## 12. ⚡ Teknik Altyapı
+
+```
+• Dil           : Python 3.12+
+• Ana AI Motor  : Google Gemini 2.5 Flash
+• Yerel AI      : Ollama (qwen/deepseek/llama)
+• Görü Motoru   : OpenCV + numpy HSV (10-50x hız avantajı)
+• UI Framework  : PyQt / Tkinter Overlay + Web HUD
+• Otomasyon     : PyAutoGUI
+• Güvenlik Tarama: Bandit + Pylint
+• Test Koşucu   : pytest
+• VCS           : Git + GitHub API (PR otomasyonu)
+• Arduino       : Serial COM iletişimi (akıllı ev)
+• Mobil Köprü   : Telegram Bot (uzaktan kontrol)
+```
+
+---
+
+*Son güncelleme: Mayıs 2026 — F.R.I.D.A.Y. Pro Edition*

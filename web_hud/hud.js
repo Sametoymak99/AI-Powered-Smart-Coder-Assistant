@@ -62,6 +62,28 @@ async function pollStatus() {
         // Update Active Badges
         updateBadges(data.sentinel_active, data.gesture_active);
         
+        // Update Gaming HUD status
+        if (data.game_status) {
+            const crosshairEl = document.getElementById('hud-crosshair-status');
+            const boosterEl = document.getElementById('hud-booster-status');
+            
+            if (data.game_status.crosshair_active) {
+                crosshairEl.className = "game-hud-value active";
+                crosshairEl.innerText = "AKTİF";
+            } else {
+                crosshairEl.className = "game-hud-value inactive";
+                crosshairEl.innerText = "KAPALI";
+            }
+            
+            if (data.game_status.boosted_game) {
+                boosterEl.className = "game-hud-value active";
+                boosterEl.innerText = `AKTİF (${data.game_status.boosted_game})`;
+            } else {
+                boosterEl.className = "game-hud-value inactive";
+                boosterEl.innerText = "PASİF";
+            }
+        }
+
         // Update Terminal logs if updated
         updateTerminalLogs(data.recent_logs);
         
