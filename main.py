@@ -1153,6 +1153,24 @@ TOOL_DECLARATIONS = [
             },
             "required": ["action"]
         }
+    },
+    {
+        "name": "run_autonomous_coder",
+        "description": "Kullanıcının verdiği bir kodlama hedefini (proje oluşturma, script yazma vb.) otonom olarak kodlayıp test etmek için kullanılır. Eğer kullanıcı 'bana X kodla' veya 'bir Y programı yaz' derse bu aracı çalıştır.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "task": {
+                    "type": "STRING",
+                    "description": "Yapılacak otonom kodlama görevi (örn. 'to-do list uygulaması')"
+                },
+                "filename": {
+                    "type": "STRING",
+                    "description": "Proje için tahmini ana dosya veya klasör adı (örn. 'todo_app.py')"
+                }
+            },
+            "required": ["task", "filename"]
+        }
     }
 ]
 
@@ -2180,6 +2198,22 @@ class JarvisLive:
 
             elif name == "cancel_task":
                 result = cancel_plan()
+
+            elif name == "run_autonomous_coder":
+                task_str = args.get("task", "")
+                fname = args.get("filename", "generated_project.py")
+                if task_str:
+                    from autonomous_coder import generate_and_run_code
+                    def _run_coder():
+                        try:
+                            # Try to log to UI
+                            if getattr(self, 'ui', None):
+                                self.ui.write_log(f"SYS: '{task_str}' için otonom kodlama başlatılıyor...")
+                        except: pass
+                        return generate_and_run_code(task_str, filepath=fname)
+                    result = await loop.run_in_executor(None, _run_coder)
+                else:
+                    result = "Görev belirtilmedi."
 
             elif name == "volume_up":
                 current_vol = get_volume()

@@ -698,6 +698,7 @@ class JarvisUI:
         self._build_pause_button()
         self._build_shutdown_button()
         self._build_theme_button()
+        self._build_ai_coder_button()
         self._build_panel_toggles()
         self._build_settings_panel()
         self._build_voice_selector(self._settings_body)
@@ -880,6 +881,24 @@ class JarvisUI:
         self._draw_theme_button()
         save_app_config({"theme": self._theme_name})
 
+    def _build_ai_coder_button(self):
+        BW, BH = 140, 32
+        self._ai_coder_canvas = tk.Canvas(
+            self.root, width=BW, height=BH,
+            bg=C_BG, highlightthickness=0, cursor="hand2")
+        self._ai_coder_canvas.bind("<Button-1>", lambda e: self._run_coder_tool())
+        self._draw_ai_coder_button()
+
+    def _draw_ai_coder_button(self):
+        if not hasattr(self, "_ai_coder_canvas"):
+            return
+        c = self._ai_coder_canvas
+        BW = int(c["width"])
+        BH = int(c["height"])
+        c.delete("all")
+        c.configure(bg=C_BG)
+        c.create_text(BW//2, BH//2, text="💻  AI CODER", fill=C_PRI, font=font_body_bold(10))
+
     def _apply_theme_widgets(self):
         """Tüm statik widget'ların renklerini aktif temaya göre günceller."""
         try:
@@ -907,8 +926,8 @@ class JarvisUI:
             # Kontrol butonları (canvas) arkaplanları
             for cv in (self._mute_canvas, self._pause_canvas,
                        self._shutdown_canvas, self._settings_btn_canvas,
-                       self._theme_canvas):
-                if hasattr(cv, "configure"):
+                       self._theme_canvas, getattr(self, "_ai_coder_canvas", None)):
+                if cv and hasattr(cv, "configure"):
                     cv.configure(bg=C_BG)
 
             # Settings panel
@@ -960,6 +979,8 @@ class JarvisUI:
             self._draw_shutdown_button()
             self._draw_theme_button()
             self._draw_panel_toggles()
+            if hasattr(self, "_draw_ai_coder_button"):
+                self._draw_ai_coder_button()
 
         except Exception as ex:
             print(f"[THEME] Widget güncelleme hatası: {ex}")
@@ -1109,97 +1130,68 @@ class JarvisUI:
     def _draw_settings_tabs(self):
         for key, canvas, label in (
             ("settings", self._settings_tab_settings, "SETTINGS"),
-            ("debug",    self._settings_tab_debug,    "DEBUG"),
+            ("debug",    self._settings_tab_debug, "DEBUG")
         ):
-            active = self._settings_tab == key
-            bw = int(canvas["width"])
-            bh = int(canvas["height"])
+            active = (self._settings_tab == key)
+            fg = C_PRI if active else C_MUTED
+            bg = C_DIM if active else C_PANEL
             canvas.delete("all")
-            outline = C_PRI if active else C_DIM
-            fill = C_PANEL if active else C_BG
-            text_col = C_PRI if active else C_MID
-            canvas.create_rectangle(0, 0, bw, bh, fill=fill, outline="")
-            # Siber köşe çizgileri kaldırıldı
-            canvas.create_text(bw // 2, bh // 2, text=label, fill=text_col, font=font_body_bold(9))
-
-    def _set_settings_tab(self, tab: str):
-        self._settings_tab = "debug" if tab == "debug" else "settings"
-        self._draw_settings_tabs()
-        self._place_layout_widgets()
-
-    def _run_wallpaper_tool(self):
-        def _work():
-            self.write_log("SYS: Duvar kağıdı hava durumuna göre güncelleniyor...")
-            try:
-                from wallpaper_manager import sync_wallpaper_with_weather
-                res = sync_wallpaper_with_weather()
-                self.write_log(f"SYS: {res}")
-                self.play_success_sfx()
-            except Exception as e:
-                self.write_log(f"ERR: Eşitleme başarısız: {e}")
-                self.play_error_sfx()
-        threading.Thread(target=_work, daemon=True).start()
-
-    def _run_briefing_tool(self):
-        def _work():
-            self.write_log("SYS: Günlük brifing alınıyor...")
-            try:
-                from daily_briefing import get_daily_briefing
-                brief = get_daily_briefing()
-                self.write_log(brief)
-                self.play_success_sfx()
-            except Exception as e:
-                self.write_log(f"ERR: Brifing alınamadı: {e}")
-                self.play_error_sfx()
-        threading.Thread(target=_work, daemon=True).start()
-
-    def _run_screenshot_tool(self):
-        def _work():
-            self.write_log("SYS: Ekran görüntüsü alınıyor ve WhatsApp'ta paylaşılıyor...")
-            try:
-                from screenshot_share import take_ss_and_share
-                take_ss_and_share()
-                self.write_log("SYS: Ekran görüntüsü başarıyla paylaşıldı.")
-                self.play_success_sfx()
-            except Exception as e:
-                self.write_log(f"ERR: Paylaşım başarısız: {e}")
-                self.play_error_sfx()
-        threading.Thread(target=_work, daemon=True).start()
+            canvas.configure(bg=bg)
+            w = int(canvas["width"])
+            h = int(canvas["height"])
+            canvas.create_text(w//2, h//2, text=label, fill=fg, font=font_display(9))
 
     def _run_coder_tool(self):
-        # Varsayılan çirkin pencere yerine Slate temalı premium ve çerçevesiz (borderless) modal
+        # Premium, Slate/Concentric temalı çerçevesiz (borderless) otonom coder modalı
         dialog = tk.Toplevel(self.root)
         dialog.configure(bg=C_BG)
         dialog.resizable(False, False)
         
-        # Ekranın tam ortasına yerleştir (Breathing room için genişlik ve yüksekliği artırdık)
-        dialog_w, dialog_h = 440, 285
+        # Ekranın tam ortasına konumlandırma
+        dialog_w, dialog_h = 500, 360
         rx = self.root.winfo_rootx() + (self.W - dialog_w) // 2
         ry = self.root.winfo_rooty() + (self.H - dialog_h) // 2
         dialog.geometry(f"{dialog_w}x{dialog_h}+{rx}+{ry}")
         
         dialog.transient(self.root)
         dialog.grab_set()
-        # Kenarlık ve Çerçevesizlik (Ultra premium overlay görünümü)
-        dialog.configure(highlightthickness=1, highlightbackground=C_PRI)
+        
+        # Ultra premium çift katmanlı teknolojik neon çeper etkisi
+        dialog.configure(highlightthickness=2, highlightbackground=C_PRI)
         dialog.overrideredirect(True)
         dialog.attributes("-topmost", True)
         dialog.lift()
-        # İndigo/Slate İçerik Alanı
-        content = tk.Frame(dialog, bg=C_BG, padx=22, pady=20)
+        
+        # Ana içerik çerçevesi (Breathing room & Padding)
+        content = tk.Frame(dialog, bg=C_BG, padx=24, pady=22)
         content.pack(fill="both", expand=True)
         
-        title_lbl = tk.Label(content, text="💻  F.R.I.D.A.Y. Otonom Geliştirici", 
-                             fg=C_PRI, bg=C_BG, font=font_body_bold(12))
-        title_lbl.pack(anchor="w", pady=(0, 6))
+        # --- ÜST BAŞLIK & AKILLI CANVAS DEKORASYONU ---
+        header_frame = tk.Frame(content, bg=C_BG)
+        header_frame.pack(fill="x", pady=(0, 6))
         
-        desc_text = ("Geliştirilmesini istediğiniz görevi yazın. Kodlar belirttiğiniz "
-                     "dosyaya yazılacak, otomatik çalıştırılacak ve hatalar düzeltilecektir.")
+        title_lbl = tk.Label(header_frame, text="💻  F.R.I.D.A.Y. OTONOM CODER", 
+                             fg=C_PRI, bg=C_BG, font=font_display(12))
+        title_lbl.pack(side="left")
+        
+        # Küçük süsleyici neon çizgi ve Kapat Butonu
+        decor_canvas = tk.Canvas(header_frame, width=100, height=2, bg=C_BG, highlightthickness=0)
+        decor_canvas.pack(side="right", padx=(10, 0), pady=10)
+        decor_canvas.create_line(0, 1, 100, 1, fill=C_ORG2, width=2)
+
+        close_btn = tk.Label(header_frame, text="✕", fg=C_MUTED, bg=C_BG, font=font_body_bold(12), cursor="hand2")
+        close_btn.pack(side="right", padx=10)
+        close_btn.bind("<Button-1>", lambda e: dialog.destroy())
+        close_btn.bind("<Enter>", lambda e: close_btn.configure(fg=C_RED))
+        close_btn.bind("<Leave>", lambda e: close_btn.configure(fg=C_MUTED))
+        
+        desc_text = ("Sadece hedefinizi belirtin. F.R.I.D.A.Y. otonom olarak kodları yazar, "
+                     "sanal ortam kurup test eder ve tüm hataları kendi kendine giderir.")
         desc_lbl = tk.Label(content, text=desc_text, fg=C_MUTED, bg=C_BG, 
-                            font=font_body(9), justify="left", wraplength=390)
-        desc_lbl.pack(anchor="w", pady=(0, 10))
+                            font=font_body(9), justify="left", wraplength=450, anchor="w")
+        desc_lbl.pack(fill="x", pady=(0, 12))
         
-        # Backend Durum Bilgisi (Dynamic Status Label)
+        # --- MOTOR DURUM BİLGİSİ (Kapsül Tasarım) ---
         from autonomous_coder import is_ollama_running, get_installed_ollama_models
         ollama_ok = is_ollama_running()
         models = get_installed_ollama_models() if ollama_ok else []
@@ -1212,26 +1204,115 @@ class JarvisUI:
             best_model = models[0]
             
         if ollama_ok and best_model:
-            # Tkinter'da bozuk kutu gibi görünmesini önlemek için emojiyi temiz ve elit bir Unicode tik (✔) ile değiştirdik
-            status_txt = f"⚡ Aktif Motor: Gemini  [Ollama: Hazır ({best_model}) ✔]"
+            status_txt = f" ●   Motor: Gemini + Yerel Ollama [Hazır: {best_model}]"
             status_fg = C_GREEN
         elif ollama_ok:
-            status_txt = "⚠️ Aktif Motor: Gemini  [Ollama: Model Eksik (qwen2.5-coder önerilir) ⚠️]"
+            status_txt = " ●   Motor: Gemini [Yerel Ollama: Model Eksik (qwen2.5-coder önerilir)]"
             status_fg = C_GOLD
         else:
-            status_txt = "🌐 Aktif Motor: Gemini  [Yerel Ollama: Çevrimdışı]"
-            status_fg = C_MUTED
+            status_txt = " ●   Motor: Gemini Bulut Çekirdeği [Yerel Ollama: Çevrimdışı]"
+            status_fg = C_BLUE
             
-        status_lbl = tk.Label(content, text=status_txt, fg=status_fg, bg=C_BG, 
-                              font=font_body_bold(8), justify="left")
-        status_lbl.pack(anchor="w", pady=(0, 12))
+        status_frame = tk.Frame(content, bg=C_DIMMER, highlightthickness=1, highlightbackground=C_MID, padx=12, pady=6)
+        status_frame.pack(fill="x", pady=(0, 16))
         
-        # Dosya adı alanı
+        status_lbl = tk.Label(status_frame, text=status_txt, fg=status_fg, bg=C_DIMMER, 
+                              font=font_body_bold(8), anchor="w")
+        status_lbl.pack(fill="x")
+        
+        # --- FORM ELEMANLARI ---
+        
+        # 1. Proje Dosya Adı Girişi
         file_frame = tk.Frame(content, bg=C_BG)
-        file_frame.pack(fill="x", pady=(0, 8))
-        tk.Label(file_frame, text="Proje Dosyası:", fg=C_MID, bg=C_BG, font=font_body(9)).pack(side="left")
+        file_frame.pack(fill="x", pady=(0, 12))
+        
+        file_label = tk.Label(file_frame, text="Proje Dosyası Adı:", fg=C_MUTED, bg=C_BG, font=font_body_bold(9))
+        file_label.pack(anchor="w", pady=(0, 4))
+        
         filename_var = tk.StringVar(value="generated_project.py")
-        file_entry = tk.Entry(file_frame, textvariable=filename_var, fg="#ffffff", bg="#1e293b",
+        file_entry = tk.Entry(file_frame, textvariable=filename_var, fg=C_TEXT, bg=C_PANEL,
+                              insertbackground=C_TEXT, borderwidth=0, font=font_body(10),
+                              highlightthickness=1, highlightbackground=C_MID, highlightcolor=C_ORG2)
+        file_entry.pack(fill="x", ipady=6)
+        
+        # 2. Görev Girişi
+        task_frame = tk.Frame(content, bg=C_BG)
+        task_frame.pack(fill="x", pady=(0, 20))
+        
+        task_label = tk.Label(task_frame, text="Yapılmasını İstediğiniz Kodlama Görevi:", fg=C_MUTED, bg=C_BG, font=font_body_bold(9))
+        task_label.pack(anchor="w", pady=(0, 4))
+        
+        task_var = tk.StringVar()
+        entry = tk.Entry(task_frame, textvariable=task_var, fg=C_TEXT, bg=C_PANEL,
+                         insertbackground=C_TEXT, borderwidth=0, font=font_body(11),
+                         highlightthickness=1, highlightbackground=C_MID, highlightcolor=C_PRI)
+        entry.pack(fill="x", ipady=8)
+        entry.focus_set()
+        
+        # Focus-in / Focus-out Neon Parlama Efektleri
+        def on_focus_in(e, color):
+            e.widget.configure(highlightbackground=color, highlightthickness=1)
+            
+        def on_focus_out(e, color):
+            e.widget.configure(highlightbackground=C_MID, highlightthickness=1)
+            
+        file_entry.bind("<FocusIn>", lambda e: on_focus_in(e, C_ORG2))
+        file_entry.bind("<FocusOut>", lambda e: on_focus_out(e, C_MID))
+        entry.bind("<FocusIn>", lambda e: on_focus_in(e, C_PRI))
+        entry.bind("<FocusOut>", lambda e: on_focus_out(e, C_MID))
+        
+        # --- BUTONLAR ---
+        btn_frame = tk.Frame(content, bg=C_BG)
+        btn_frame.pack(fill="x")
+        
+        def _cancel():
+            dialog.destroy()
+            
+        def _start():
+            task = task_var.get().strip()
+            filepath = filename_var.get().strip()
+            if not task:
+                return
+            dialog.destroy()
+            
+            def _work():
+                self.write_log(f"SYS: '{task}' görevi için ({filepath}) otonom kodlama başlatıldı. Lütfen bekleyin...")
+                try:
+                    from autonomous_coder import generate_and_run_code
+                    res = generate_and_run_code(task, filepath=filepath)
+                    self.write_log(res)
+                    self.play_success_sfx()
+                except Exception as e:
+                    self.write_log(f"ERR: Kod üretimi başarısız: {e}")
+                    self.play_error_sfx()
+            threading.Thread(target=_work, daemon=True).start()
+            
+        entry.bind("<Return>", lambda e: _start())
+        entry.bind("<Escape>", lambda e: _cancel())
+        
+        # Flat Premium Butonlar (Interactive Hover Animations)
+        cancel_btn = tk.Button(btn_frame, text="İPTAL ET", command=_cancel, fg=C_TEXT, bg=C_DIM,
+                               activeforeground=C_TEXT, activebackground=C_RED,
+                               font=font_body_bold(9), borderwidth=0, cursor="hand2", padx=20, pady=8)
+        cancel_btn.pack(side="right", padx=(12, 0))
+        
+        start_btn = tk.Button(btn_frame, text="OTONOM PROJEYİ BAŞLAT", command=_start, fg=C_BG, bg=C_PRI,
+                              activeforeground=C_TEXT, activebackground=C_ORG,
+                              font=font_body_bold(9), borderwidth=0, cursor="hand2", padx=24, pady=8)
+        start_btn.pack(side="right")
+        
+        # Hover olay bağlayıcıları
+        def on_btn_enter(btn, hover_bg, hover_fg):
+            btn.configure(bg=hover_bg, fg=hover_fg)
+            
+        def on_btn_leave(btn, idle_bg, idle_fg):
+            btn.configure(bg=idle_bg, fg=idle_fg)
+            
+        cancel_btn.bind("<Enter>", lambda e: on_btn_enter(cancel_btn, C_RED, C_TEXT))
+        cancel_btn.bind("<Leave>", lambda e: on_btn_leave(cancel_btn, C_DIM, C_TEXT))
+        
+        start_btn.bind("<Enter>", lambda e: on_btn_enter(start_btn, C_ORG, C_TEXT))
+        start_btn.bind("<Leave>", lambda e: on_btn_leave(start_btn, C_PRI, C_BG))(file_frame, textvariable=filename_var, fg="#ffffff", bg="#1e293b",
                               insertbackground="#ffffff", borderwidth=0, font=font_body(10),
                               highlightthickness=1, highlightbackground="#334155", highlightcolor=C_PRI, width=22)
         file_entry.pack(side="left", padx=10, ipady=4)
@@ -1290,24 +1371,38 @@ class JarvisUI:
             highlightthickness=0,
         )
         
-        # Modern Styled Buttons matching the Slate Theme
-        btn_style = {
-            "fg": C_TEXT, 
-            "bg": C_DIM, 
-            "activeforeground": C_BG, 
-            "activebackground": C_PRI,
-            "font": font_body_bold(9), 
-            "borderwidth": 0, 
-            "padx": 12, 
-            "pady": 6, 
-            "cursor": "hand2",
-            "relief": "flat"
-        }
+        # Premium Slate Theme Button Factory with Hover Effects
+        def create_tool_btn(text, command, highlight_color=C_PRI):
+            btn = tk.Button(self._tools_panel, text=text, command=command,
+                            fg=C_TEXT, bg=C_DIM, activeforeground=C_TEXT, activebackground=highlight_color,
+                            font=font_body_bold(9), borderwidth=0, cursor="hand2", padx=12, pady=6, relief="flat")
+            btn.pack(fill="x", pady=4)
+            
+            def on_enter(e):
+                btn.configure(bg=highlight_color, fg=C_BG)
+            def on_leave(e):
+                btn.configure(bg=C_DIM, fg=C_TEXT)
+                
+            btn.bind("<Enter>", on_enter)
+            btn.bind("<Leave>", on_leave)
+            return btn
+            
+        create_tool_btn("☀️  Duvar Kağıdını Eşitle", lambda: self._run_wallpaper_tool() if hasattr(self, '_run_wallpaper_tool') else None, C_BLUE)
+        create_tool_btn("📝  Günlük Brifingi Başlat", lambda: self._run_briefing_tool() if hasattr(self, '_run_briefing_tool') else None, C_ORG)
+        create_tool_btn("📸  Ekran Görüntüsü Paylaş", lambda: self._run_screenshot_tool() if hasattr(self, '_run_screenshot_tool') else None, C_GREEN)
         
-        tk.Button(self._tools_panel, text="☀️  Duvar Kağıdını Eşitle", command=self._run_wallpaper_tool, **btn_style).pack(fill="x", pady=3)
-        tk.Button(self._tools_panel, text="📝  Günlük Brifingi Başlat", command=self._run_briefing_tool, **btn_style).pack(fill="x", pady=3)
-        tk.Button(self._tools_panel, text="📸  Ekran Görüntüsü Paylaş", command=self._run_screenshot_tool, **btn_style).pack(fill="x", pady=3)
-        tk.Button(self._tools_panel, text="💻  Otonom Geliştiriciyi Başlat (Coder)", command=self._run_coder_tool, **btn_style).pack(fill="x", pady=3)
+        # Otonom Coder for tools panel
+        create_tool_btn("💻  Otonom Geliştiriciyi Başlat (Coder)", self._run_coder_tool, C_PRI)
+
+    def _run_wallpaper_tool(self):
+        # To be overridden by main.py or other controllers
+        pass
+
+    def _run_briefing_tool(self):
+        pass
+
+    def _run_screenshot_tool(self):
+        pass
 
     def _layout_settings_controls(self):
         inner_w = self._settings_geometry["panel_w"] - 24
@@ -1669,7 +1764,8 @@ class JarvisUI:
         pause_w = 126
         shutdown_w = int(self._shutdown_canvas["width"])
         theme_w = int(self._theme_canvas["width"])
-        total = mute_w + pause_w + shutdown_w + theme_w + gap * 3
+        coder_w = int(self._ai_coder_canvas["width"]) if hasattr(self, "_ai_coder_canvas") else 140
+        total = mute_w + pause_w + shutdown_w + theme_w + coder_w + gap * 4
         start_x = self.FCX - total // 2
         row1_y = self.CTRL_Y + 20
 
@@ -1677,6 +1773,8 @@ class JarvisUI:
         self._pause_canvas.place(x=start_x + mute_w + gap, y=row1_y)
         self._shutdown_canvas.place(x=start_x + mute_w + pause_w + gap * 2, y=row1_y)
         self._theme_canvas.place(x=start_x + mute_w + pause_w + shutdown_w + gap * 3, y=row1_y)
+        if hasattr(self, "_ai_coder_canvas"):
+            self._ai_coder_canvas.place(x=start_x + mute_w + pause_w + shutdown_w + theme_w + gap * 4, y=row1_y)
 
         geo = self._settings_geometry
         panel_x = geo["panel_x"]

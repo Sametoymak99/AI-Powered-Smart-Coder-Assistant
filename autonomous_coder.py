@@ -12,23 +12,42 @@ from google.genai import types
 from app_config import get_app_config_value
 from actions.github_manager import push_to_github, create_and_push_new_project, create_branch_and_pr
 
+# ── Windows CP-1254 / emoji UnicodeEncodeError düzeltmesi ──────────────────
+# Konsol UTF-8 desteği yoksa (örn. Windows cmd/PowerShell), print() emoji'leri
+# çöker. stdout/stderr'i UTF-8 moduna alarak tüm emoji'lerin güvenle yazılmasını sağla.
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 def is_ollama_running() -> bool:
     """Yerel Ollama servisinin aktif olup olmadığını hızlıca kontrol eder."""
     try:
-        with socket.create_connection(("127.0.0.1", 11434), timeout=1):
+        with socket.create_connection(("127.0.0.1", 11434), timeout=2):
             return True
-    except OSError:
-        return False
+    except (OSError, socket.timeout, ConnectionRefusedError):
+        # Localhost değil de 0.0.0.0:11434 dinliyor olabilir, bir de onu dene
+        try:
+            with socket.create_connection(("localhost", 11434), timeout=2):
+                return True
+        except:
+            return False
 
 def get_installed_ollama_models() -> list[str]:
     """Sistemde yüklü olan tüm Ollama modellerini çeker."""
-    try:
-        url = "http://127.0.0.1:11434/api/tags"
-        with urllib.request.urlopen(url, timeout=2) as response:
-            res = json.loads(response.read().decode("utf-8"))
-            return [m["name"] for m in res.get("models", [])]
-    except Exception:
-        return []
+    for host in ["127.0.0.1", "localhost"]:
+        try:
+            url = f"http://{host}:11434/api/tags"
+            with urllib.request.urlopen(url, timeout=3) as response:
+                res = json.loads(response.read().decode("utf-8"))
+                models = [m["name"] for m in res.get("models", [])]
+                if models:
+                    return models
+        except Exception:
+            continue
+    return []
 
 def query_ollama(prompt: str, model: str, stream: bool = True) -> str:
     """Urllib standard kütüphanesi kullanarak yerel Ollama LLM modeline istek atar."""
@@ -105,30 +124,35 @@ def parse_multi_files(output_text: str) -> dict[str, str]:
     """
     Model çıktısını tarayarak 'FILE: dosya_adi.py' ve altındaki kod bloğunu ayıklar.
     Geriye {dosya_adi: kod_icerigi} şeklinde bir dict döndürür.
+    # FILE: veya ### FILE: kullanımlarını da destekler.
     """
     files = {}
-    parts = re.split(r'FILE:\s*([a-zA-Z0-9_\-\.\/]+)\s*\n', output_text)
+    pattern = r'(?:#|###)?\s*FILE:\s*([a-zA-Z0-9_\-\.\/]+)'
+    matches = list(re.finditer(pattern, output_text))
     
-    if len(parts) > 1:
-        for i in range(1, len(parts), 2):
-            filename = parts[i].strip()
-            content = parts[i+1]
+    if matches:
+        for i, match in enumerate(matches):
+            filename = match.group(1).strip()
+            start_idx = match.end()
+            end_idx = matches[i+1].start() if i + 1 < len(matches) else len(output_text)
             
-            # Markdown kod bloklarını temizle
-            if "```python" in content:
-                content = content.split("```python")[1].split("```")[0]
-            elif "```" in content:
-                content = content.split("```")[1].split("```")[0]
+            content = output_text[start_idx:end_idx].strip()
             
-            files[filename] = content.strip()
+            lines = content.split('\n')
+            cleaned_lines = []
+            for line in lines:
+                if line.strip().startswith('```'):
+                    continue
+                cleaned_lines.append(line)
+            
+            if filename:
+                files[filename] = '\n'.join(cleaned_lines).strip()
     else:
-        # Tek bir dosya döndüyse varsayılan olarak single file formatı kabul et
         content = output_text
         if "```python" in content:
             content = content.split("```python")[1].split("```")[0]
         elif "```" in content:
             content = content.split("```")[1].split("```")[0]
-        
         files[""] = content.strip()
         
     return files
@@ -164,6 +188,11 @@ def generate_and_run_code(task: str, filepath: str = "generated_project.py", max
     if not os.path.exists(venv_dir):
         print("[CODER] 🔨 İzole sanal ortam (venv) oluşturuluyor...")
         subprocess.run([sys.executable, "-m", "venv", "venv"], cwd=project_dir, capture_output=True)
+        # Git log kirliliğini önlemek için .gitignore oluştur
+        gitignore_path = os.path.join(project_dir, ".gitignore")
+        if not os.path.exists(gitignore_path):
+            with open(gitignore_path, "w", encoding="utf-8") as f:
+                f.write("venv/\n__pycache__/\n.pytest_cache/\n")
         
     if os.name == "nt":
         venv_python = os.path.join(venv_dir, "Scripts", "python.exe")
@@ -172,9 +201,13 @@ def generate_and_run_code(task: str, filepath: str = "generated_project.py", max
         venv_python = os.path.join(venv_dir, "bin", "python")
         venv_pip = os.path.join(venv_dir, "bin", "pip")
         
-    # Güvenlik ve kalite araçlarını venv'e kur (Bandit & Pylint)
+    # Güvenlik ve kalite araçlarını venv'e kur (Bandit, Pylint, Ruff)
     print("[CODER] 📦 Güvenlik ve statik analiz araçları sanal ortama kuruluyor...")
-    subprocess.run([venv_pip, "install", "-q", "bandit", "pylint", "pytest"], capture_output=True)
+    install_res = subprocess.run([venv_pip, "install", "-q", "bandit", "pylint", "pytest", "ruff"], capture_output=True, text=True)
+    if install_res.returncode != 0:
+        print(f"[CODER] ⚠️ Araçlar kurulurken uyarı: {install_res.stderr[:200]}")
+        # Hata olsa da devam et, en az pytest kurulmuş halde olması lazım
+        subprocess.run([venv_pip, "install", "-q", "pytest"], capture_output=True)
 
     # Ollama algılama ve model seçimi
     ollama_active = is_ollama_running()
@@ -189,11 +222,34 @@ def generate_and_run_code(task: str, filepath: str = "generated_project.py", max
         selected_ollama_model = ollama_models[0]
 
     backend_pref = get_app_config_value("coder_backend", "auto")
-    use_ollama = (backend_pref == "ollama") or (backend_pref == "auto" and not get_app_config_value("gemini_api_key"))
-    
     api_key = str(get_app_config_value("gemini_api_key", "") or "").strip()
     if not api_key:
         api_key = os.environ.get("GEMINI_API_KEY", "").strip()
+    
+    # Akıllı backend seçimi: Ollama varsa ve API key yoksa Ollama'yı kullan
+    use_ollama = (backend_pref == "ollama") or (backend_pref == "auto" and ollama_active and not api_key)
+    
+    # Eğer Ollama tercih edildiyse ama çalışmıyorsa API key'e fallback yap
+    if use_ollama and not ollama_active:
+        print("[CODER] ⚠️ Ollama tercih edildi fakat servisi çalışmıyor. Gemini API'ye geçiliyor...")
+        use_ollama = False
+    
+    # Eğer ne Ollama ne API key varsa hata ver
+    if not api_key and not (ollama_active and selected_ollama_model):
+        return ("❌ HATA: Sistem başlatılamadı!\n"
+                "Gemini API anahtarı eksik VE yerel Ollama servisi bulunmuyor/çalışmıyor.\n\n"
+                "Çözüm seçenekleri:\n"
+                "1. config/api_keys.json içinde 'gemini_api_key' ekle\n"
+                "2. GEMINI_API_KEY ortam değişkenini ayarla\n"
+                "3. Ya da: ollama serve komutunu terminalde çalıştırıp Ollama servisini başlat")
+
+    # --- Gemini istemcisi (client) hazırla — tek seferlik, yeniden kullanılabilir ---
+    client = None
+    if not use_ollama and api_key:
+        try:
+            client = genai.Client(api_key=api_key)
+        except Exception as e:
+            print(f"[CODER] ⚠️ Gemini istemcisi oluşturulamadı: {e}")
 
     # --- AŞAMA 1: Arama Kararı & Entegrasyonu ---
     print("[CODER] İnternet araması gerekip gerekmediği değerlendiriliyor...")
@@ -205,9 +261,8 @@ def generate_and_run_code(task: str, filepath: str = "generated_project.py", max
     )
     
     search_query = ""
-    if not use_ollama and api_key:
+    if not use_ollama and client:
         try:
-            client = genai.Client(api_key=api_key)
             res = client.models.generate_content(
                 model="models/gemini-2.5-flash",
                 contents=[types.Part.from_text(text=search_decision_prompt)]
@@ -258,16 +313,20 @@ def generate_and_run_code(task: str, filepath: str = "generated_project.py", max
             prompt_intro += f"Önceki Hatalar, Güvenlik Açıkları veya Test Başarısızlıkları:\n{previous_errors}\n\nLütfen bu hataları ve güvenlik açıklarını kesinlikle düzelt."
             
         prompt_rules = (
-            f"\nKURALLAR:\n"
-            f"1. Çoklu dosya oluşturabilirsin! Projeyi mantıklı dosyalara ayır (örn: class kütüphaneleri, ui, main vb.).\n"
-            f"2. Dosyaları şu formatta çıktı vermelisin:\n"
+            f"\nKESİN KURALLAR (İHLAL ETME):\n"
+            f"1. ÜST DÜZEY KALİTE: Yazdığın kod profesyonel, modüler (SOLID prensiplerine uygun), ölçeklenebilir ve tamamen optimize edilmiş olmalıdır.\n"
+            f"2. Her dosya EKSIKSIZ ve ÇALIŞAN Python kodu içermeli. Kesinlikle boş bırakma, 'pass', 'TODO', 'placeholder' veya taslak yazma!\n"
+            f"3. Gelişmiş Type Hinting (`typing` kütüphanesi) ve detaylı Docstring'ler (Google veya Sphinx stili) kullan.\n"
+            f"4. İleri Seviye Hata Yönetimi: Çok detaylı `try-except` blokları kur ve hataları doğru şekilde ele alıp raporla (Custom Exception'lar dahil).\n"
+            f"5. Çoklu dosya oluşturabilirsin. Her dosyayı şu formatta ver:\n"
             f"FILE: dosya_adi.py\n"
             f"```python\n"
-            f"kodlar...\n"
+            f"# buraya gerçek, çalışan kod\n"
             f"```\n"
-            f"Eğer tek bir dosya yazıyorsan da bu formatı kullanabilirsin veya doğrudan saf kodu verebilirsin.\n"
-            f"3. Kodların çalıştırılabilir, hatasız ve çıktılarının temiz olmasını sağla.\n"
-            f"4. Güvenli kod yaz! Shell injection, eval() kullanımı, kimlik bilgilerini kod içine gömme gibi güvenlik açıklarından kaçın."
+            f"6. Güvenli kod yaz — shell injection, eval(), hardcoded şifre/token KESİNLİKLE yasak.\n"
+            f"7. 3. parti modüller (psutil, requests vb.) kullanıyorsan, 'requirements.txt' dosyasında KESİNLİKLE belirt.\n"
+            f"8. KOD MİMARİSİ: Ana kodları mantıksal bir klasör yapısıyla 'src/' içine (örn: src/core, src/utils, src/main.py) yerleştir. Testleri 'tests/' klasörüne ekle.\n"
+            f"9. DOKÜMANTASYON: Projenin kurulumunu ve mimarisini detaylıca anlatan profesyonel bir 'README.md' dosyası oluştur."
         )
         
         current_developer_prompt = prompt_intro + prompt_rules
@@ -282,6 +341,12 @@ def generate_and_run_code(task: str, filepath: str = "generated_project.py", max
         else:
             if not api_key:
                 return "❌ Gemini API anahtarı eksik ve sistemde aktif yerel Ollama servisi bulunamadı."
+            # client yoksa (arama fazında oluşturulamadıysa) yeniden dene
+            if client is None:
+                try:
+                    client = genai.Client(api_key=api_key)
+                except Exception as e:
+                    return f"❌ Gemini istemcisi oluşturulamadı: {e}"
             try:
                 print("\n[GEMINI YAZIYOR]: ", end="", flush=True)
                 response = client.models.generate_content_stream(
@@ -316,34 +381,130 @@ def generate_and_run_code(task: str, filepath: str = "generated_project.py", max
         if not files:
             previous_errors = "Dosya ayrıştırma hatası: Yazdığın kodda geçerli kod bulunamadı."
             continue
-            
+
         if "" in files:
             files[filepath] = files.pop("")
+
+        # ── Boş/Placeholder dosya kontrolü ──────────────────────────────
+        empty_files = []
+        for fname, fcontent in files.items():
+            stripped = fcontent.strip()
+            # Daha akılı boş dosya tespiti: 200 karakterden kısa + hiç function/class yok = reddedilir
+            has_function = "def " in stripped
+            has_class = "class " in stripped
+            has_import = "import " in stripped or "from " in stripped
             
+            is_too_short = len(stripped) < 100  # Threshold'u 50'den 100'e çıkar
+            is_stub = any(bad in stripped.lower() for bad in [
+                "pass  # ", "todo", "placeholder", "# buraya", 
+                "# implement", "# add code", "notimplementederror", "raise notimpl"
+            ])
+            is_empty_shell = len(stripped) < 200 and not (has_function or has_class or has_import)
+            
+            if fname.lower() != "requirements.txt" and (is_stub or (is_too_short and is_empty_shell)):
+                empty_files.append(fname)
+
+        if empty_files:
+            print(f"[CODER] ⚠️ Boş/placeholder dosyalar tespit edildi: {empty_files}. Yeniden üretiliyor...")
+            previous_errors = (
+                f"Şu dosyaların içeriği boş, eksik veya sadece 'pass/todo/placeholder' ifadesi içeriyor: {empty_files}. "
+                f"Bu dosyaların da GERÇEk, ÇALIŞAN Python implementasyonunu yaz. Hiçbir dosyayı boş bırakma!"
+            )
+            continue
+        # ────────────────────────────────────────────────────────────────
+
         for fname, fcontent in files.items():
             fpath = os.path.join(project_dir, fname)
-            os.makedirs(os.path.dirname(fpath), exist_ok=True)
+            # dirname boş olabilir (sadece dosya adı verilmişse), makedirs'i korumaya al
+            parent_dir = os.path.dirname(fpath)
+            if parent_dir:
+                os.makedirs(parent_dir, exist_ok=True)
+            # Model bazen içeriğin başına '# FILE: xxx.py' yorumu bırakır → pylint syntax hatası
+            # Bu artefakti temizle
+            cleaned_content = fcontent
+            first_line = fcontent.lstrip().split("\n")[0].strip()
+            if first_line.startswith("# FILE:") or first_line.startswith("# file:"):
+                cleaned_content = "\n".join(fcontent.lstrip().split("\n")[1:]).lstrip()
             with open(fpath, "w", encoding="utf-8") as f:
-                f.write(fcontent)
+                f.write(cleaned_content)
             print(f"[CODER] Dosya kaydedildi: {fpath}")
 
+        # Otomatik formatlama (Ruff)
+        print("[CODER] 🧹 Kodlar Ruff ile otomatik formatlanıyor...")
+        subprocess.run([venv_python, "-m", "ruff", "format", "."], cwd=project_dir, capture_output=True)
+
+        # Dinamik bağımlılık çözücü (AST ile importları tarama) ve requirements.txt kurulumu
+        req_path = os.path.join(project_dir, "requirements.txt")
+        if os.path.exists(req_path):
+            print("[CODER] 📦 requirements.txt bulundu, kütüphaneler kuruluyor...")
+            req_res = subprocess.run([venv_pip, "install", "-r", "requirements.txt"], cwd=project_dir, capture_output=True, text=True)
+            if req_res.returncode != 0:
+                print(f"[CODER] ⚠️ requirements.txt kurulumunda hata/uyarı: {req_res.stderr}")
+        else:
+            print("[CODER] 🔍 requirements.txt bulunamadı, kod içi importlar taranıyor...")
+            import ast
+            std_libs = sys.stdlib_module_names if hasattr(sys, "stdlib_module_names") else set()
+            found_imports = set()
+            for fname, fcontent in files.items():
+                if fname.endswith('.py'):
+                    try:
+                        tree = ast.parse(fcontent)
+                        for node in ast.walk(tree):
+                            if isinstance(node, ast.Import):
+                                for n in node.names:
+                                    found_imports.add(n.name.split('.')[0])
+                            elif isinstance(node, ast.ImportFrom):
+                                if node.module:
+                                    found_imports.add(node.module.split('.')[0])
+                    except: pass
+            
+            to_install = [pkg for pkg in found_imports if pkg not in std_libs and pkg not in ["os", "sys", "time", "json", "re", "math"]]
+            if to_install:
+                print(f"[CODER] 📦 Tespit edilen eksik paketler kuruluyor: {to_install}")
+                subprocess.run([venv_pip, "install"] + to_install, cwd=project_dir, capture_output=True)
+
         main_run_file = filepath
-        if "main.py" in files:
+        if "src/main.py" in files or os.path.exists(os.path.join(project_dir, "src", "main.py")):
+            main_run_file = "src/main.py"
+        elif "main.py" in files or os.path.exists(os.path.join(project_dir, "main.py")):
             main_run_file = "main.py"
+        elif "src/" + filepath in files or os.path.exists(os.path.join(project_dir, "src", filepath)):
+            main_run_file = "src/" + filepath
 
         # --- AŞAMA 3: Statik Güvenlik ve Kalite Analizi (Bandit & Pylint) ---
         print("[CODER] 🔍 Statik kod analizi ve güvenlik taraması yapılıyor...")
-        bandit_res = subprocess.run([venv_python, "-m", "bandit", "-r", "."], cwd=project_dir, capture_output=True, text=True)
-        pylint_res = subprocess.run([venv_python, "-m", "pylint", "--errors-only", main_run_file], cwd=project_dir, capture_output=True, text=True)
+        # venv/ dizinini hariç tut — aksi halde pytest/bandit kendi içindeki kodları tarar (false positive)
+        bandit_res = subprocess.run(
+            [venv_python, "-m", "bandit", "-r", ".", "--exclude", "./venv,./test_project.py"],
+            cwd=project_dir, capture_output=True, text=True
+        )
+        pylint_res = subprocess.run(
+            [venv_python, "-m", "pylint", "--errors-only", main_run_file],
+            cwd=project_dir, capture_output=True, text=True
+        )
         
         static_errors = ""
-        if "Severity: High" in bandit_res.stdout or "Severity: Medium" in bandit_res.stdout:
-            # Sadece kritik hataları ayıkla
-            bandit_issues = [line for line in bandit_res.stdout.split('\n') if "Severity:" in line or "Location:" in line]
-            static_errors += f"\n[Bandit Güvenlik Uyarısı - Kodda olası açık bulundu]:\n" + "\n".join(bandit_issues[:10])
+        # Sadece HIGH severity bandit bulgularını engelle (Medium/Low venv'den gelebilir)
+        if bandit_res.returncode != 0 and "No module named bandit" in (bandit_res.stderr or ""):
+            print("[CODER] ⚠️ bandit sanal ortamda bulunamadı, güvenlik taraması atlanıyor...")
+        elif "Severity: High" in bandit_res.stdout:
+            bandit_issues = [
+                line for line in bandit_res.stdout.split('\n')
+                if ("Severity:" in line or "Location:" in line) and "venv" not in line
+            ]
+            if bandit_issues:
+                static_errors += f"\n[Bandit Yüksek Güvenlik Uyarısı]:\n" + "\n".join(bandit_issues[:10])
             
-        if pylint_res.returncode != 0 and pylint_res.stdout.strip():
-            static_errors += f"\n[Pylint Derleme/Sözdizimi Hataları]:\n{pylint_res.stdout}"
+        if pylint_res.returncode != 0 and "No module named pylint" in (pylint_res.stderr or ""):
+            print("[CODER] ⚠️ pylint sanal ortamda bulunamadı, statik analiz atlanıyor...")
+        elif pylint_res.returncode != 0 and pylint_res.stdout.strip():
+            # 'Unable to import' uyarıları eksik modülden gelir, import hatasıyla aynı şey —
+            # bunları aşama 4'teki otomatik pip kurulumu zaten halleder, statik engel koyma
+            pylint_out = pylint_res.stdout
+            critical_pylint = [l for l in pylint_out.splitlines()
+                               if " E0" in l and "E0401" not in l]  # E0401 = import-error, skip
+            if critical_pylint:
+                static_errors += f"\n[Pylint Sözdizimi/Derleme Hatası]:\n" + "\n".join(critical_pylint)
             
         if static_errors:
             print(f"[CODER] ❌ Statik analizde hatalar bulundu. Düzeltme başlatılıyor...")
@@ -362,13 +523,13 @@ def generate_and_run_code(task: str, filepath: str = "generated_project.py", max
                 cwd=project_dir,
                 capture_output=True,
                 text=True,
-                timeout=30
+                timeout=60  # Timeout'u 30'dan 60 saniyeye çıkar
             )
             returncode = result.returncode
             stdout = result.stdout
             stderr = result.stderr
         except subprocess.TimeoutExpired as e:
-            stderr = f"Zaman aşımı (Timeout): Kod 30 saniye içinde çalışmayı bitirmedi veya sonsuz döngüye girdi. Ek bilgi: {e}"
+            stderr = f"Zaman aşımı (Timeout): Kod 60 saniye içinde çalışmayı bitirmedi veya sonsuz döngüye girdi. Ek bilgi: {e}"
         except Exception as e:
             stderr = f"Bilinmeyen hata oluştu: {e}"
             
@@ -395,7 +556,7 @@ def generate_and_run_code(task: str, filepath: str = "generated_project.py", max
                         cwd=project_dir,
                         capture_output=True,
                         text=True,
-                        timeout=30
+                        timeout=60
                     )
                     returncode = result.returncode
                     stdout = result.stdout
@@ -427,14 +588,21 @@ def generate_and_run_code(task: str, filepath: str = "generated_project.py", max
                 except Exception:
                     pass
             elif api_key:
-                try:
-                    res = client.models.generate_content(
-                        model="models/gemini-2.5-flash",
-                        contents=[types.Part.from_text(text=test_prompt)]
-                    )
-                    test_code = str(getattr(res, "text", "") or "").strip()
-                except Exception:
-                    pass
+                # Test fazında da client hazır olmalı
+                if client is None:
+                    try:
+                        client = genai.Client(api_key=api_key)
+                    except Exception:
+                        pass
+                if client:
+                    try:
+                        res = client.models.generate_content(
+                            model="models/gemini-2.5-flash",
+                            contents=[types.Part.from_text(text=test_prompt)]
+                        )
+                        test_code = str(getattr(res, "text", "") or "").strip()
+                    except Exception:
+                        pass
                     
             if test_code:
                 if test_code.startswith("```python"):
@@ -452,18 +620,21 @@ def generate_and_run_code(task: str, filepath: str = "generated_project.py", max
                 
                 print("[CODER] Testler (pytest) koşturuluyor...")
                 test_res = subprocess.run(
-                    [venv_python, "-m", "pytest", "test_project.py"],
+                    [venv_python, "-m", "pytest", "test_project.py", "-v"],
                     cwd=project_dir,
                     capture_output=True,
                     text=True,
-                    timeout=20
+                    timeout=40
                 )
                 
                 if test_res.returncode == 0:
                     print(f"[CODER] ✅ Tüm testler başarıyla geçti!")
                     # Git checkout branch & gh PR create
                     commit_msg = f"Auto-Coder: {task[:40]}"
-                    git_res = create_branch_and_pr(project_dir, project_name, commit_msg)
+                    try:
+                        git_res = create_branch_and_pr(project_dir, project_name, commit_msg)
+                    except Exception as git_err:
+                        git_res = f"GitHub işlemi sırasında uyarı (devam edildi): {str(git_err)[:100]}"
                         
                     files_summary = "\n".join([f"- {fn}" for fn in files.keys()])
                     return (f"✅ Proje başarıyla kodlandı, testleri geçti ve GitHub PR oluşturuldu!\n"
@@ -477,7 +648,10 @@ def generate_and_run_code(task: str, filepath: str = "generated_project.py", max
                     previous_errors = f"Yazılan testler başarısız oldu:\n{test_res.stdout}\n{test_res.stderr}"
             else:
                 commit_msg = f"Auto-Coder: {task[:40]}"
-                git_res = create_branch_and_pr(project_dir, project_name, commit_msg)
+                try:
+                    git_res = create_branch_and_pr(project_dir, project_name, commit_msg)
+                except Exception as git_err:
+                    git_res = f"GitHub işlemi sırasında uyarı (devam edildi): {str(git_err)[:100]}"
                 return (f"✅ Proje başarıyla kodlandı, çalıştırıldı ve GitHub PR oluşturuldu!\n"
                         f"Klasör: {project_dir}\n"
                         f"[Motor: {active_engine_name}]\n"

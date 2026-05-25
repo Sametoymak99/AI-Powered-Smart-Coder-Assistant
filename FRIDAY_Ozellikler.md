@@ -136,15 +136,22 @@
 
 ## 9. 🤖 Otonom Kod Geliştirici
 
-> Sadece bir görev tanımla — F.R.I.D.A.Y. kodlar, test eder, GitHub'a gönderir!
+> F.R.I.D.A.Y.'in en gelişmiş modülü. Sadece ne istediğinizi söyleyin, F.R.I.D.A.Y. sıfırdan kurumsal seviyede kod yazsın!
+
+### Gelişmiş Özellikler
+- **SOLID Mimarisi & Type Hinting**: Üretilen kodlar en üst düzey standartlarda, modüler ve `typing` desteklidir.
+- **İleri Seviye Hata Yönetimi**: Kodlar custom exception'lar ve detaylı try-except bloklarıyla donatılır.
+- **Dinamik Bağımlılık (AST)**: Sistem eksik kütüphaneleri kaynak koddaki import'ları okuyarak (AST) otomatik tespit edip kurar.
+- **Otomatik Dokümantasyon**: Her proje için detaylı `README.md` ve kurumsal klasör yapısı (`src/`, `tests/`) otomatik oluşturulur.
+- **Kullanıcı Dostu UI**: Sesli veya buton aracılığıyla çalışan, pencereli ve tek tıkla kapatılabilen (✕) modern otonom kod arayüzü.
 
 ### Çalışma Akışı
 ```
 1. 🔍 İnternet Araması  →  DuckDuckGo ile güncel döküman çek
-2. 💻 Geliştirici Ajan  →  Gemini 2.5 Flash veya Ollama ile kod üret
+2. 💻 Geliştirici Ajan  →  Gemini 2.5 Flash veya Ollama ile kod üret (SOLID Prensipli)
 3. 🔒 Güvenlik Taraması →  Bandit + Pylint statik analiz
-4. ▶️  Sandbox Çalıştır  →  İzole Python venv içinde test et
-5. 📦 Oto Paket Kurulum →  Eksik kütüphaneleri otomatik kur
+4. 📦 Oto Paket Kurulum →  AST taraması ile eksik kütüphaneleri bul ve kur
+5. ▶️  Sandbox Çalıştır  →  İzole Python venv içinde test et
 6. 🧪 Testçi Ajan       →  pytest ile otomatik test yaz ve koştur
 7. 🚀 GitHub PR          →  Branch aç, commit et, Pull Request oluştur
 ```
