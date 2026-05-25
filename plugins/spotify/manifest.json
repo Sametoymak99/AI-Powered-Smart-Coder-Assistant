@@ -1,0 +1,9 @@
+{
+  "name": "Spotify",
+  "version": "1.0",
+  "author": "Samet",
+  "description": "Spotify müzik kontrolü (Windows PowerShell / Hotkey entegrasyonu)",
+  "tools": ["spotify_play", "spotify_pause", "spotify_next", "spotify_prev", "spotify_volume"],
+  "entry": "plugin.py",
+  "enabled": true
+}

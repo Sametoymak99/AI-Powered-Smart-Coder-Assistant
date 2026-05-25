@@ -55,6 +55,22 @@ from actions.game_helper import game_helper_control
 from actions.sys_control import set_volume, set_brightness
 from actions.alarms_timers import set_timer, set_alarm
 
+# ── F.R.I.D.A.Y. NEXUS Imports ──────────────────────────────────────────────
+from plugins.plugin_loader import plugin_loader
+from core.nexus_ws_server import nexus_ws_server
+from memory.long_term_memory import long_term_memory
+from core.model_router import model_router
+from core.security_layer import security_layer
+from core.personality import personality_system
+from core.self_improvement import self_improver
+from core.screen_monitor import screen_monitor
+from core.wake_word import wake_word
+from agents import (
+    AgentBus, SecurityAgent, CodingAgent, HealthAgent, 
+    PersonalAgent, VisionAgent, SmartHomeAgent
+)
+# ─────────────────────────────────────────────────────────────────────────────
+
 # ── Paths ───────────────────────────────────────────────────────────────────
 BASE_DIR        = Path(__file__).resolve().parent
 PROMPT_PATH     = BASE_DIR / "core" / "prompt.txt"
@@ -1180,14 +1196,25 @@ def get_api_key() -> str:
 
 
 def load_system_prompt() -> str:
+    base_prompt = ""
     try:
-        return PROMPT_PATH.read_text(encoding="utf-8")
+        base_prompt = PROMPT_PATH.read_text(encoding="utf-8")
     except Exception:
-        return (
-            "Sen F.R.I.D.A.Y'sin — Windows'ta çalışan kişisel AI asistanı. "
+        base_prompt = (
+            "Sen F.R.I.D.A.Y. NEXUS'sın — Windows'ta çalışan gelişmiş bir AI asistan işletim sistemi. "
             "Türkçe konuş. Kısa ve net yanıtlar ver. "
-            "Araçları kullanarak görevleri tamamla, asla taklit etme."
+            "Araçları kullanarak görevleri tamamla."
         )
+    
+    # Nexus Dynamic Enhancements
+    personality_prefix = personality_system.get_prompt_prefix()
+    memory_context = long_term_memory.get_context_summary(15)
+    patterns = long_term_memory.get_patterns()
+    pattern_context = ""
+    if patterns:
+        pattern_context = "\n[ÖĞRENİLEN KULLANICI ALIŞKANLIKLARI / PATTERNS]\n" + "\n".join([f"- {p['pattern_data']}" for p in patterns[:5]])
+        
+    return f"{base_prompt}\n{personality_prefix}\n{pattern_context}\n\n[SON KONUŞMA BAĞLAMI]\n{memory_context}\n"
 
 
 import http.server
@@ -1467,6 +1494,35 @@ class JarvisLive:
         self._awaiting_rfid = True  # Başlangıçta kilitli
         self._startup_greeting_uid = None
         
+        # ── F.R.I.D.A.Y. NEXUS Plugin & Multi-Agent Initialization ──────────
+        plugin_loader.scan_and_load()
+        global TOOL_DECLARATIONS
+        TOOL_DECLARATIONS.extend(plugin_loader.get_tool_declarations())
+
+        self.bus = agent_bus
+        self.security_agent = SecurityAgent(self.bus)
+        self.coding_agent = CodingAgent(self.bus)
+        self.health_agent = HealthAgent(self.bus)
+        self.personal_agent = PersonalAgent(self.bus)
+        self.vision_agent = VisionAgent(self.bus)
+        self.smart_home_agent = SmartHomeAgent(self.bus)
+        
+        self.security_agent.start()
+        self.coding_agent.start()
+        self.health_agent.start()
+        self.personal_agent.start()
+        self.vision_agent.start()
+        self.smart_home_agent.start()
+
+        # Start Screen Monitor & Wake Word
+        screen_monitor.start(callback=self.handle_screen_context_change)
+        try:
+            wake_word.start(callback=self.handle_wake_word_detected)
+        except Exception as ww_err:
+            print(f"[JARVIS] [UYARI] Wake word baslatilamadi: {ww_err}")
+
+        # ─────────────────────────────────────────────────────────────────────
+
         # Arduino olay dinleyicisini ayarla
         set_arduino_event_callback(self.handle_arduino_event)
         
@@ -1476,11 +1532,57 @@ class JarvisLive:
         # Web HUD sunucusunu başlat
         self.start_web_hud_server()
 
+    def handle_screen_context_change(self, context: dict):
+        msg = f"SYS: Ekran bağlamı değişti. Aktif: {context['active_app']} ({context['context_type']})"
+        self.ui.write_log(msg)
+        try:
+            nexus_ws_server.broadcast({
+                "type": "ai_log",
+                "data": {"message": f"Ekran tespiti: {context['active_app']} - {context['suggestion']}", "level": "info"}
+            })
+        except Exception:
+            pass
+
+    def handle_wake_word_detected(self):
+        self.ui.write_log("🔊 SYS: Wake Word (Friday) algılandı!")
+        self.ui.play_success_sfx()
+
+    def ws_get_plugins(self, msg: dict, client):
+        nexus_ws_server.broadcast({
+            "type": "plugins_list",
+            "data": plugin_loader.list_plugins()
+        })
+
+    def ws_toggle_plugin(self, msg: dict, client):
+        name = msg["data"]["name"]
+        enabled = msg["data"]["enabled"]
+        if enabled:
+            plugin_loader.enable_plugin(name)
+        else:
+            plugin_loader.disable_plugin(name)
+        self.ws_get_plugins(msg, client)
+
+    def ws_quick_command(self, msg: dict, client):
+        cmd = msg["data"]["command"]
+        self.ui.write_log(f"SYS: Arayüzden komut alındı: {cmd}")
+        self.ui.root.after(0, lambda: self._on_text_command(cmd))
+
+    def ws_search_memory(self, msg: dict, client):
+        query = msg["data"]["query"]
+        history = long_term_memory.search_history(query)
+        formatted = "\n".join([f"Kullanıcı: {h['command']} -> F.R.I.D.A.Y.: {h['result']}" for h in history])
+        nexus_ws_server.broadcast({
+            "type": "memory_update",
+            "data": formatted or "Eşleşen kayıt bulunamadı."
+        })
+
     def start_web_hud_server(self):
         def _server_thread():
             import socket
             import http.server
             import threading
+            import psutil
+            import shutil
             
             # Local IP bul
             local_ip = "127.0.0.1"
@@ -1495,9 +1597,48 @@ class JarvisLive:
             port = 8080
             WebHUDRequestHandler.live_instance = self
             
+            # Start WS Server
+            nexus_ws_server.register_handler("get_plugins", self.ws_get_plugins)
+            nexus_ws_server.register_handler("toggle_plugin", self.ws_toggle_plugin)
+            nexus_ws_server.register_handler("quick_command", self.ws_quick_command)
+            nexus_ws_server.register_handler("search_memory", self.ws_search_memory)
+            nexus_ws_server.start()
+
+            # Background broadcast stats to WS
+            def _ws_broadcast_loop():
+                import time
+                while True:
+                    try:
+                        cpu = psutil.cpu_percent()
+                        ram = psutil.virtual_memory().percent
+                        total, used, free = shutil.disk_usage("/")
+                        disk = round((used / total) * 100, 1)
+                        
+                        nexus_ws_server.broadcast({
+                            "type": "system_status",
+                            "data": {"cpu": cpu, "ram": ram, "disk": disk}
+                        })
+                        nexus_ws_server.broadcast({
+                            "type": "agent_status",
+                            "data": self.bus.get_agent_status()
+                        })
+                        nexus_ws_server.broadcast({
+                            "type": "brain_status",
+                            "data": {
+                                "provider": model_router.get_best_model("")["provider"].upper(),
+                                "model": model_router.get_best_model("")["model"],
+                                "personality": personality_system.current_mode.capitalize(),
+                                "self_improvement": 95
+                            }
+                        })
+                    except Exception:
+                        pass
+                    time.sleep(2)
+            threading.Thread(target=_ws_broadcast_loop, daemon=True).start()
+            
             try:
                 server = http.server.ThreadingHTTPServer((local_ip, port), WebHUDRequestHandler)
-                self.ui.write_log(f"SYS: Yerel Mobil HUD aktif! Tabletinizden şu adrese girin: http://{local_ip}:{port}")
+                self.ui.write_log(f"SYS: Yerel Mobil HUD aktif! http://{local_ip}:{port}")
                 print(f"[JARVIS] 🌐 Yerel Mobil HUD Sunucusu Aktif: http://{local_ip}:{port}")
                 server.serve_forever()
             except Exception as ex:
@@ -1851,12 +1992,42 @@ class JarvisLive:
         print(f"[F.R.I.D.A.Y] 🔧 {name} {args}")
         self.ui.set_state("THINKING")
 
+        import time
+        t_start = time.time()
+
+        # Security check: Shell run
+        if name == "shell_run":
+            safe, reason = security_layer.check_shell_command(args.get("command", ""))
+            if not safe:
+                security_layer.log_audit("BLOCKED", name, args, reason, "high")
+                print(f"[Security] 🛡️ {reason}")
+                return types.FunctionResponse(id=fc.id, name=name, response={"result": reason})
+
+        # Security check: Execute code (Python)
+        if name == "execute_code":
+            safe, warnings = security_layer.check_python_code(args.get("code", ""))
+            if not safe:
+                reason = "Python kod çalıştırılması engellendi: " + ", ".join(warnings)
+                security_layer.log_audit("BLOCKED", name, args, reason, "high")
+                print(f"[Security] 🛡️ {reason}")
+                return types.FunctionResponse(id=fc.id, name=name, response={"result": reason})
+
         loop   = asyncio.get_event_loop()
         result = "Tamam."
         had_exception = False
 
+        # Log audit
+        security_layer.log_audit("INVOKE", name, args, "In Progress", "low")
+
         try:
-            from actions.sys_control import set_volume, get_volume
+            # Handle Plugins Dynamically
+            plugin_handlers = plugin_loader.get_all_handlers()
+            if name in plugin_handlers:
+                handler = plugin_handlers[name]
+                res = await loop.run_in_executor(None, lambda: handler(**args))
+                result = str(res)
+            else:
+                from actions.sys_control import set_volume, get_volume
             if name == "save_memory":
                 cat = args.get("category", "notes")
                 key = args.get("key", "")
@@ -2342,6 +2513,35 @@ class JarvisLive:
             self.speak_error(name, e)
 
         tool_failed = self._result_looks_like_error(result)
+        duration_ms = int((time.time() - t_start) * 1000)
+
+        # Log to Self Improvement and Long Term Memory
+        if tool_failed:
+            self_improver.log_failure(name, str(result), str(args))
+            security_layer.log_audit("FAILED", name, args, str(result), "medium")
+        else:
+            self_improver.log_success(name, duration_ms)
+            security_layer.log_audit("SUCCESS", name, args, str(result), "low")
+
+        long_term_memory.log_interaction(f"{name} {args}", str(result), "core", duration_ms)
+
+        # Broadcast update to websocket clients
+        try:
+            nexus_ws_server.broadcast({
+                "type": "ai_log",
+                "data": {"message": f"Araç çalıştırıldı: {name} ({duration_ms}ms) -> {str(result)[:80]}", "level": "success" if not tool_failed else "danger"}
+            })
+            nexus_ws_server.broadcast({
+                "type": "security_audit",
+                "data": security_layer.get_audit_log(10)
+            })
+            nexus_ws_server.broadcast({
+                "type": "memory_update",
+                "data": long_term_memory.get_context_summary(10)
+            })
+        except Exception:
+            pass
+
         if tool_failed:
             if not had_exception:
                 self.ui.set_state("ERROR")

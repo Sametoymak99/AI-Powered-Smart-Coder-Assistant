@@ -1,0 +1,9 @@
+{
+  "name": "Home Assistant",
+  "version": "1.0",
+  "author": "Samet",
+  "description": "Home Assistant akıllı ev IoT cihaz kontrolü",
+  "tools": ["ha_toggle_entity", "ha_get_state", "ha_call_service"],
+  "entry": "plugin.py",
+  "enabled": false
+}

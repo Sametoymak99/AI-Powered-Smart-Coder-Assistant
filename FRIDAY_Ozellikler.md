@@ -1,7 +1,7 @@
-# 🤖 F.R.I.D.A.Y. — Yapay Zeka Asistanı Yetenek Rehberi
+# 🤖 F.R.I.D.A.Y. NEXUS — Gelişmiş Çoklu Ajan AI OS Yetenek Rehberi
 
 > **F**emale **R**eplacement **I**ntelligent **D**igital **A**ssistant **Y**outh  
-> Geliştirici: Samet Oymak | Versiyon: 2026 Pro
+> Geliştirici: Samet Oymak | Sürüm: F.R.I.D.A.Y. NEXUS Pro Edition (2026)
 
 ---
 
@@ -189,22 +189,22 @@
 
 ---
 
-## 12. ⚡ Teknik Altyapı
+## 12. ⚡ Gelişmiş NEXUS Mimarisi & Teknik Altyapı
 
 ```
-• Dil           : Python 3.12+
-• Ana AI Motor  : Google Gemini 2.5 Flash
-• Yerel AI      : Ollama (qwen/deepseek/llama)
-• Görü Motoru   : OpenCV + numpy HSV (10-50x hız avantajı)
-• UI Framework  : PyQt / Tkinter Overlay + Web HUD
-• Otomasyon     : PyAutoGUI
-• Güvenlik Tarama: Bandit + Pylint
-• Test Koşucu   : pytest
-• VCS           : Git + GitHub API (PR otomasyonu)
-• Arduino       : Serial COM iletişimi (akıllı ev)
-• Mobil Köprü   : Telegram Bot (uzaktan kontrol)
+• Dil                : Python 3.12+ / JavaScript (ES6)
+• Ana AI Motor       : Google Gemini 2.5 Flash
+• Yerel AI           : Ollama (qwen/deepseek/llama)
+• Ajan Mimarisi      : Event-driven Çoklu Ajan (Multi-Agent) Sistemi (Security, Coding, Health, Personal, Vision, SmartHome)
+• Uzun Süreli Hafıza : SQLite Veritabanı + Ziyaret/Saat Alışkanlığı Desen Çıkarıcı (Patterns)
+• Eklenti (Plugin)   : JSON Manifest tabanlı Dinamik Yükleyici (Spotify, Discord, Home Assistant)
+• Güvenlik & Audit   : Shell / Python kodu tarayıcı whitelist/blacklist, audit loglama
+• Model Router       : Göreve (Kod, Görü, Hızlı, Planlama) göre akıllı Ollama/Gemini yönlendirici
+• Ekran Bağlamı      : OCR destekli 5 saniyelik ekran analizi ve dinamik yönlendirme
+• Kontrol Paneli     : Orbitron Glassmorphic Web HUD (HTML5/CSS3/WebSocket real-time sync)
+• Arduino & Akıllı Ev: Serial COM + MQTT/HA desteği
 ```
 
 ---
 
-*Son güncelleme: Mayıs 2026 — F.R.I.D.A.Y. Pro Edition*
+*Son güncelleme: Mayıs 2026 — F.R.I.D.A.Y. NEXUS Pro Edition*

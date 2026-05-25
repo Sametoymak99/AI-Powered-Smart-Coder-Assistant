@@ -1,0 +1,9 @@
+{
+  "name": "Discord",
+  "version": "1.0",
+  "author": "Samet",
+  "description": "Discord kontrol ve durum entegrasyonu",
+  "tools": ["discord_status", "discord_mute", "discord_deafen"],
+  "entry": "plugin.py",
+  "enabled": true
+}

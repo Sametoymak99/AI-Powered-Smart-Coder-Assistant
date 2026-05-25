@@ -1,307 +1,275 @@
-/* ==========================================================================
-   F.R.I.D.A.Y. WEB HUD — CLIENT CONTROLLER MODULE
-   ========================================================================== */
+let socket;
+let sysChart;
+const maxChartPoints = 20;
+const cpuData = [];
+const ramData = [];
+const chartLabels = [];
 
-const API_BASE = window.location.origin;
+for (let i = 0; i < maxChartPoints; i++) {
+    cpuData.push(0);
+    ramData.push(0);
+    chartLabels.push("");
+}
 
-let isConnected = false;
-let lastLogs = [];
-let speechRecognizer = null;
-let isListening = false;
+function initWebSocket() {
+    const statusBadge = document.getElementById("conn-status");
+    
+    // Connect to local WebSocket server running in main.py
+    socket = new WebSocket("ws://localhost:8765");
 
-// DOM Elements
-const connBadge = document.getElementById('conn-badge');
-const connText = document.getElementById('conn-text');
-const stateBadge = document.getElementById('state-badge');
-const cpuGauge = document.getElementById('cpu-gauge');
-const cpuVal = document.getElementById('cpu-val');
-const ramGauge = document.getElementById('ram-gauge');
-const ramVal = document.getElementById('ram-val');
-const batGauge = document.getElementById('bat-gauge');
-const batVal = document.getElementById('bat-val');
-const terminalLog = document.getElementById('terminal-log');
-const aiReactor = document.getElementById('ai-reactor');
-const emotionLabel = document.getElementById('emotion-label');
-const btnSentinel = document.getElementById('btn-sentinel');
-const sentinelStatus = document.getElementById('sentinel-status');
-const btnGesture = document.getElementById('btn-gesture');
-const gestureStatus = document.getElementById('gesture-status');
-const cmdInput = document.getElementById('cmd-input');
-const btnMic = document.getElementById('btn-mic');
-const cameraViewport = document.getElementById('camera-viewport');
-const hudCameraFeed = document.getElementById('hud-camera-feed');
-const aiCoreContainer = document.getElementById('ai-core-container');
+    socket.onopen = () => {
+        statusBadge.innerText = "BAĞLANDI";
+        statusBadge.className = "status-badge connected";
+        addLog("NEXUS WebSocket bağlantısı kuruldu.", "success");
+        // Request initial plugins
+        socket.send(JSON.stringify({ type: "get_plugins" }));
+    };
 
-// 1. POLL SYSTEM STATUS
-async function pollStatus() {
-    try {
-        const response = await fetch(`${API_BASE}/api/status`);
-        if (!response.ok) throw new Error("API unreachable");
-        
-        const data = await response.json();
-        
-        // Update connection state
-        if (!isConnected) {
-            isConnected = true;
-            connBadge.className = "badge badge-connected";
-            connText.innerText = "BAĞLANDI";
-            addTerminalLine("SYS: F.R.I.D.A.Y. Protokol Köprüsü bağlandı.", "sys-line");
+    socket.onclose = () => {
+        statusBadge.innerText = "BAĞLANTI KESİLDİ";
+        statusBadge.className = "status-badge disconnected";
+        addLog("Bağlantı koptu. 5 saniye sonra tekrar denenecek...", "danger");
+        setTimeout(initWebSocket, 5000);
+    };
+
+    socket.onerror = (err) => {
+        console.error("WS error: ", err);
+    };
+
+    socket.onmessage = (event) => {
+        try {
+            const msg = JSON.parse(event.data);
+            handleMessage(msg);
+        } catch (e) {
+            console.error("Failed parsing message: ", e);
         }
+    };
+}
+
+function handleMessage(msg) {
+    switch (msg.type) {
+        case "system_status":
+            updateSystemStatus(msg.data);
+            break;
+        case "agent_status":
+            updateAgentStatus(msg.data);
+            break;
+        case "ai_log":
+            addLog(msg.data.message, msg.data.level);
+            break;
+        case "plugins_list":
+            updatePluginsList(msg.data);
+            break;
+        case "memory_update":
+            updateMemory(msg.data);
+            break;
+        case "security_audit":
+            updateAudit(msg.data);
+            break;
+        case "brain_status":
+            updateBrainStatus(msg.data);
+            break;
+    }
+}
+
+function updateSystemStatus(data) {
+    document.getElementById("cpu-val").innerText = `${data.cpu}%`;
+    document.getElementById("cpu-bar").style.width = `${data.cpu}%`;
+    
+    document.getElementById("ram-val").innerText = `${data.ram}%`;
+    document.getElementById("ram-bar").style.width = `${data.ram}%`;
+    
+    document.getElementById("disk-val").innerText = `${data.disk}%`;
+    document.getElementById("disk-bar").style.width = `${data.disk}%`;
+
+    // Update Chart
+    cpuData.shift();
+    cpuData.push(data.cpu);
+    ramData.shift();
+    ramData.push(data.ram);
+    
+    sysChart.update();
+}
+
+function updateAgentStatus(agents) {
+    const container = document.getElementById("agents-container");
+    container.innerHTML = "";
+    
+    for (const [name, status] of Object.entries(agents)) {
+        const item = document.createElement("div");
+        item.className = "agent-item";
         
-        // Update state badge
-        stateBadge.innerText = data.state;
+        const dot = document.createElement("span");
+        dot.className = `status-dot ${status.running ? 'active' : 'inactive'}`;
         
-        // Update Gauges (dasharray size is 251)
-        updateCircularGauge(cpuGauge, cpuVal, data.sys_stats.cpu);
-        updateCircularGauge(ramGauge, ramVal, data.sys_stats.ram);
-        updateCircularGauge(batGauge, batVal, data.sys_stats.battery);
+        const nameSpan = document.createElement("span");
+        nameSpan.className = "agent-name";
+        nameSpan.innerText = `${name} Agent`;
         
-        // Update Empathy Core colors
-        updateEmpathyCore(data.user_emotion);
+        const lastEv = document.createElement("span");
+        lastEv.className = "agent-event";
+        const evType = status.last_event ? status.last_event.event_type : "Boşta";
+        lastEv.innerText = evType;
         
-        // Update Active Badges
-        updateBadges(data.sentinel_active, data.gesture_active);
+        item.appendChild(dot);
+        item.appendChild(nameSpan);
+        item.appendChild(lastEv);
+        container.appendChild(item);
+    }
+}
+
+function updatePluginsList(plugins) {
+    const container = document.getElementById("plugins-container");
+    container.innerHTML = "";
+    
+    plugins.forEach(p => {
+        const item = document.createElement("div");
+        item.className = "plugin-item";
         
-        // Update Gaming HUD status
-        if (data.game_status) {
-            const crosshairEl = document.getElementById('hud-crosshair-status');
-            const boosterEl = document.getElementById('hud-booster-status');
-            
-            if (data.game_status.crosshair_active) {
-                crosshairEl.className = "game-hud-value active";
-                crosshairEl.innerText = "AKTİF";
-            } else {
-                crosshairEl.className = "game-hud-value inactive";
-                crosshairEl.innerText = "KAPALI";
+        const nameSpan = document.createElement("span");
+        nameSpan.className = "plugin-name";
+        nameSpan.innerText = `${p.name} v${p.version}`;
+        
+        const label = document.createElement("label");
+        label.className = "switch";
+        
+        const input = document.createElement("input");
+        input.type = "checkbox";
+        input.checked = p.enabled;
+        input.onchange = () => togglePlugin(p.name, input.checked);
+        
+        const slider = document.createElement("span");
+        slider.className = "slider";
+        
+        label.appendChild(input);
+        label.appendChild(slider);
+        
+        item.appendChild(nameSpan);
+        item.appendChild(label);
+        container.appendChild(item);
+    });
+}
+
+function togglePlugin(name, enabled) {
+    socket.send(JSON.stringify({
+        type: "toggle_plugin",
+        data: { name: name, enabled: enabled }
+    }));
+}
+
+function updateBrainStatus(data) {
+    document.getElementById("model-provider").innerText = data.provider;
+    document.getElementById("model-name").innerText = data.model;
+    document.getElementById("personality-mode").innerText = data.personality;
+    document.getElementById("improvement-score").innerText = `${data.self_improvement}/100`;
+}
+
+function updateMemory(memoryText) {
+    const container = document.getElementById("memory-container");
+    container.innerHTML = "";
+    
+    const lines = memoryText.split("\n");
+    lines.forEach(line => {
+        if (line.trim()) {
+            const div = document.createElement("div");
+            div.className = "log-entry info";
+            div.innerText = line;
+            container.appendChild(div);
+        }
+    });
+}
+
+function updateAudit(auditLogs) {
+    const container = document.getElementById("audit-container");
+    container.innerHTML = "";
+    
+    auditLogs.forEach(log => {
+        const div = document.createElement("div");
+        const risk = log.risk_level === "high" ? "danger" : (log.risk_level === "medium" ? "warning" : "info");
+        div.className = `log-entry ${risk}`;
+        div.innerText = `[${log.tool}] ${log.action} -> ${log.result}`;
+        container.appendChild(div);
+    });
+}
+
+function addLog(message, level = "info") {
+    const container = document.getElementById("log-stream-container");
+    const entry = document.createElement("div");
+    entry.className = `log-entry ${level}`;
+    
+    const now = new Date();
+    const timeStr = now.toTimeString().split(' ')[0];
+    
+    entry.innerText = `[${timeStr}] ${message}`;
+    container.insertBefore(entry, container.firstChild);
+    
+    if (container.childNodes.length > 100) {
+        container.removeChild(container.lastChild);
+    }
+}
+
+function sendCommand(cmd) {
+    socket.send(JSON.stringify({
+        type: "quick_command",
+        data: { command: cmd }
+    }));
+    addLog(`Hızlı komut gönderildi: ${cmd}`, "info");
+}
+
+function initClock() {
+    setInterval(() => {
+        const now = new Date();
+        document.getElementById("clock").innerText = now.toTimeString().split(' ')[0];
+    }, 1000);
+}
+
+function initChart() {
+    const ctx = document.getElementById('sys-chart').getContext('2d');
+    sysChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: chartLabels,
+            datasets: [
+                {
+                    label: 'CPU',
+                    data: cpuData,
+                    borderColor: '#00d4ff',
+                    borderWidth: 1.5,
+                    pointRadius: 0,
+                    fill: false,
+                    tension: 0.4
+                },
+                {
+                    label: 'RAM',
+                    data: ramData,
+                    borderColor: '#7c3aed',
+                    borderWidth: 1.5,
+                    pointRadius: 0,
+                    fill: false,
+                    tension: 0.4
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { display: false },
+                y: { min: 0, max: 100, ticks: { color: '#6272a4', font: { size: 10 } } }
             }
-            
-            if (data.game_status.boosted_game) {
-                boosterEl.className = "game-hud-value active";
-                boosterEl.innerText = `AKTİF (${data.game_status.boosted_game})`;
-            } else {
-                boosterEl.className = "game-hud-value inactive";
-                boosterEl.innerText = "PASİF";
-            }
         }
-
-        // Update Terminal logs if updated
-        updateTerminalLogs(data.recent_logs);
-        
-    } catch (error) {
-        if (isConnected) {
-            isConnected = false;
-            connBadge.className = "badge badge-disconnected";
-            connText.innerText = "BAĞLANTI KESİLDİ";
-            addTerminalLine("ERR: Sunucu bağlantısı kesildi. Yeniden deneniyor...", "err-line");
-        }
-    }
+    });
 }
 
-// UPDATE CIRCULAR DASH METRICS
-function updateCircularGauge(circleElement, textElement, value) {
-    const val = Math.round(value || 0);
-    textElement.innerText = `${val}%`;
+window.onload = () => {
+    initClock();
+    initChart();
+    initWebSocket();
     
-    // Circle path calculations (251 dasharray limit)
-    const offset = 251 - (251 * val) / 100;
-    circleElement.style.strokeDashoffset = offset;
-}
-
-// UPDATE CORE THEMES
-function updateEmpathyCore(emotion) {
-    const activeEmotion = emotion ? emotion.toLowerCase() : 'calm';
-    
-    // Clear dynamic classes
-    aiReactor.className = `emotion-${activeEmotion}`;
-    
-    // Map text labels
-    const emotionLabels = {
-        'calm': 'EMPATHY CORE // STANDBY (CYAN)',
-        'tired': 'EMPATHY CORE // UYKULU / DİNLENME (BLUE)',
-        'energetic': 'EMPATHY CORE // HİPERAKTİF / COŞKULU (GOLD)',
-        'stressed': 'EMPATHY CORE // GERGİN / YATIŞTIRMA (VIOLET)'
+    document.getElementById("memory-search").oninput = (e) => {
+        socket.send(JSON.stringify({
+            type: "search_memory",
+            data: { query: e.target.value }
+        }));
     };
-    
-    emotionLabel.innerText = emotionLabels[activeEmotion] || `EMPATHY CORE // ${activeEmotion.toUpperCase()}`;
-}
-
-// UPDATE BADGE BUTTONS ACTIVE STATE
-function updateBadges(sentinelActive, gestureActive) {
-    if (sentinelActive) {
-        btnSentinel.classList.add('active');
-        sentinelStatus.innerText = "ACTIVE RADAR";
-    } else {
-        btnSentinel.classList.remove('active');
-        sentinelStatus.innerText = "STANDBY";
-    }
-    
-    if (gestureActive) {
-        btnGesture.classList.add('active');
-        gestureStatus.innerText = "ACTIVE DETECTOR";
-    } else {
-        btnGesture.classList.remove('active');
-        gestureStatus.innerText = "STANDBY";
-    }
-
-    // Handle Camera Viewport Visibility
-    if (sentinelActive || gestureActive) {
-        if (cameraViewport.classList.contains('viewport-hidden')) {
-            cameraViewport.classList.remove('viewport-hidden');
-            aiCoreContainer.classList.add('hidden');
-            hudCameraFeed.src = `${API_BASE}/api/video_feed`;
-            addTerminalLine("SYS: Canlı kamera akışı başlatıldı.", "sys-line");
-        }
-    } else {
-        if (!cameraViewport.classList.contains('viewport-hidden')) {
-            cameraViewport.classList.add('viewport-hidden');
-            aiCoreContainer.classList.remove('hidden');
-            hudCameraFeed.src = ""; // Stop stream
-            addTerminalLine("SYS: Canlı kamera akışı durduruldu.", "sys-line");
-        }
-    }
-}
-
-// UPDATE LOG CONSOLE FLOW
-function updateTerminalLogs(logs) {
-    if (!logs || logs.length === 0) return;
-    
-    let isNew = false;
-    if (logs.length !== lastLogs.length) {
-        isNew = true;
-    } else {
-        for (let i = 0; i < logs.length; i++) {
-            if (logs[i] !== lastLogs[i]) {
-                isNew = true;
-                break;
-            }
-        }
-    }
-    
-    if (isNew) {
-        lastLogs = logs;
-        terminalLog.innerHTML = ""; // Clear and rebuild
-        logs.forEach(line => {
-            let className = "sys-line";
-            if (line.startsWith("Siz:")) className = "user-line";
-            else if (line.startsWith("Siz (Mobil):")) className = "user-line";
-            else if (line.startsWith("JARVIS:")) className = "jarvis-line";
-            else if (line.startsWith("ERR:")) className = "err-line";
-            
-            addTerminalLine(line, className);
-        });
-    }
-}
-
-function addTerminalLine(text, className) {
-    const p = document.createElement('div');
-    p.className = `log-line ${className}`;
-    p.innerText = text;
-    terminalLog.appendChild(p);
-    terminalLog.scrollTop = terminalLog.scrollHeight;
-}
-
-// 2. TRIGGER ACTIONS
-async function triggerControl(action) {
-    try {
-        addTerminalLine(`SYS: Komut gönderiliyor: ${action}...`, "sys-line");
-        const response = await fetch(`${API_BASE}/api/control?action=${action}`, {
-            method: 'POST'
-        });
-        const data = await response.json();
-        if (data.success) {
-            addTerminalLine(`SYS: Başarılı: ${data.message}`, "sys-line");
-        } else {
-            addTerminalLine(`ERR: Hata oluştu: ${data.error}`, "err-line");
-        }
-    } catch (err) {
-        addTerminalLine(`ERR: Bağlantı hatası: ${err.message}`, "err-line");
-    }
-}
-
-// 3. SEND TEXT COMMANDS
-async function sendCommand(overrideCmd = null) {
-    const text = overrideCmd || cmdInput.value.trim();
-    if (!text) return;
-    
-    if (!overrideCmd) cmdInput.value = "";
-    
-    try {
-        addTerminalLine(`Siz (Mobil): ${text}`, "user-line");
-        const response = await fetch(`${API_BASE}/api/command`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ command: text })
-        });
-        const data = await response.json();
-        if (!data.success) {
-            addTerminalLine(`ERR: Komut gönderilemedi: ${data.error}`, "err-line");
-        }
-    } catch (err) {
-        addTerminalLine(`ERR: Bağlantı hatası: ${err.message}`, "err-line");
-    }
-}
-
-function handleInputKey(event) {
-    if (event.key === 'Enter') {
-        sendCommand();
-    }
-}
-
-// 4. WEB SPEECH RECOGNITION (REMOTE MIC OVER WIFI)
-function initSpeechRecognition() {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-        console.warn("Speech recognition not supported on this browser.");
-        btnMic.style.display = "none";
-        return;
-    }
-    
-    speechRecognizer = new SpeechRecognition();
-    speechRecognizer.continuous = false;
-    speechRecognizer.interimResults = false;
-    speechRecognizer.lang = 'tr-TR';
-    
-    speechRecognizer.onstart = () => {
-        isListening = true;
-        btnMic.classList.add('listening');
-        addTerminalLine("🎙️ Dinliyorum... Konuşun.", "sys-line");
-    };
-    
-    speechRecognizer.onresult = (event) => {
-        const resultText = event.results[0][0].transcript;
-        addTerminalLine(`🎙️ Algılanan Ses: "${resultText}"`, "user-line");
-        sendCommand(resultText);
-    };
-    
-    speechRecognizer.onerror = (event) => {
-        addTerminalLine(`🎙️ Ses Hatası: ${event.error}`, "err-line");
-    };
-    
-    speechRecognizer.onend = () => {
-        isListening = false;
-        btnMic.classList.remove('listening');
-        addTerminalLine("🎙️ Mikrofon kapatıldı.", "sys-line");
-    };
-}
-
-function toggleRemoteMic() {
-    if (!speechRecognizer) {
-        alert("Tarayıcınız ses tanımayı desteklemiyor. (Safari, Chrome veya modern mobil tarayıcılar önerilir)");
-        return;
-    }
-    
-    if (isListening) {
-        speechRecognizer.stop();
-    } else {
-        speechRecognizer.start();
-    }
-}
-
-// START SERVICE IN LOOPS
-window.addEventListener('DOMContentLoaded', () => {
-    initSpeechRecognition();
-    
-    // Poll immediately then every 1200ms
-    pollStatus();
-    setInterval(pollStatus, 1200);
-});
+};

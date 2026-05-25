@@ -3,230 +3,163 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>F.R.I.D.A.Y. — Holografik Yerel Mobil HUD</title>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <title>F.R.I.D.A.Y. NEXUS — Kontrol Paneli</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="hud.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-    <div class="cyber-grid"></div>
-
-    <!-- HEADER -->
-    <header class="hud-header">
-        <div class="header-left">
-            <span class="system-title">F.R.I.D.A.Y.</span>
-            <span class="system-subtitle">// PROTOCOL BRIDGE</span>
+    <div class="glass-bg"></div>
+    
+    <header class="nexus-header">
+        <div class="brand">
+            <div class="pulsing-orb"></div>
+            <h1 class="neon-text">F.R.I.D.A.Y. NEXUS</h1>
         </div>
-        <div class="header-right">
-            <div id="conn-badge" class="badge badge-disconnected">
-                <span class="pulse-dot"></span>
-                <span id="conn-text">BAĞLANTI KESİLDİ</span>
-            </div>
-            <div id="state-badge" class="badge">STANDBY</div>
+        <div class="header-info">
+            <span id="conn-status" class="status-badge disconnected">BAĞLANTI KESİLDİ</span>
+            <span id="clock" class="clock-display">00:00:00</span>
         </div>
     </header>
 
-    <!-- MAIN CONTAINER -->
-    <main class="hud-container">
-        <!-- SOL PANEL: GAUGE METRICLERİ -->
-        <section class="hud-panel left-panel">
-            <div class="panel-header">
-                <i class="fa-solid fa-chart-simple"></i>
-                <h2>SİSTEM METRİKLERİ</h2>
-            </div>
-            <div class="gauges-container">
-                <!-- CPU -->
-                <div class="gauge-card">
-                    <svg class="gauge-svg" viewBox="0 0 100 100">
-                        <circle class="gauge-bg" cx="50" cy="50" r="40"></circle>
-                        <circle id="cpu-gauge" class="gauge-fill cpu-fill" cx="50" cy="50" r="40" stroke-dasharray="251" stroke-dashoffset="251"></circle>
-                    </svg>
-                    <div class="gauge-info">
-                        <span id="cpu-val" class="gauge-value">--%</span>
-                        <span class="gauge-label">CPU</span>
-                    </div>
+    <main class="dashboard-grid">
+        <!-- SYSTEM STATUS -->
+        <section class="card system-card">
+            <h2 class="card-title">Sistem Durumu</h2>
+            <div class="progress-group">
+                <div class="progress-label">
+                    <span>CPU</span>
+                    <span id="cpu-val">0%</span>
                 </div>
-                <!-- RAM -->
-                <div class="gauge-card">
-                    <svg class="gauge-svg" viewBox="0 0 100 100">
-                        <circle class="gauge-bg" cx="50" cy="50" r="40"></circle>
-                        <circle id="ram-gauge" class="gauge-fill ram-fill" cx="50" cy="50" r="40" stroke-dasharray="251" stroke-dashoffset="251"></circle>
-                    </svg>
-                    <div class="gauge-info">
-                        <span id="ram-val" class="gauge-value">--%</span>
-                        <span class="gauge-label">RAM</span>
-                    </div>
-                </div>
-                <!-- BATTERY -->
-                <div class="gauge-card">
-                    <svg class="gauge-svg" viewBox="0 0 100 100">
-                        <circle class="gauge-bg" cx="50" cy="50" r="40"></circle>
-                        <circle id="bat-gauge" class="gauge-fill bat-fill" cx="50" cy="50" r="40" stroke-dasharray="251" stroke-dashoffset="251"></circle>
-                    </svg>
-                    <div class="gauge-info">
-                        <span id="bat-val" class="gauge-value">--%</span>
-                        <span class="gauge-label">PİL</span>
-                    </div>
+                <div class="progress-bar-bg">
+                    <div id="cpu-bar" class="progress-bar-fill cpu" style="width: 0%"></div>
                 </div>
             </div>
-            
-            <!-- OYUN GÜÇLENDİRİCİ PANELİ -->
-            <div class="panel-header" style="margin-top: 20px;">
-                <i class="fa-solid fa-gamepad"></i>
-                <h2>OYUN KONTROL MERKEZİ</h2>
-            </div>
-            <div class="game-hud-status">
-                <div class="game-hud-card">
-                    <span class="game-hud-label">Nişangah (Crosshair):</span>
-                    <span id="hud-crosshair-status" class="game-hud-value inactive">KAPALI</span>
+            <div class="progress-group">
+                <div class="progress-label">
+                    <span>RAM</span>
+                    <span id="ram-val">0%</span>
                 </div>
-                <div class="game-hud-card">
-                    <span class="game-hud-label">Booster Durumu:</span>
-                    <span id="hud-booster-status" class="game-hud-value inactive">PASİF</span>
+                <div class="progress-bar-bg">
+                    <div id="ram-bar" class="progress-bar-fill ram" style="width: 0%"></div>
+                </div>
+            </div>
+            <div class="progress-group">
+                <div class="progress-label">
+                    <span>Disk</span>
+                    <span id="disk-val">0%</span>
+                </div>
+                <div class="progress-bar-bg">
+                    <div id="disk-bar" class="progress-bar-fill disk" style="width: 0%"></div>
+                </div>
+            </div>
+            <canvas id="sys-chart" height="100"></canvas>
+        </section>
+
+        <!-- AGENTS STATUS -->
+        <section class="card agents-card">
+            <h2 class="card-title">Çoklu Ajan Durumu (Multi-Agent)</h2>
+            <div class="agents-list" id="agents-container">
+                <div class="agent-item">
+                    <span class="status-dot inactive"></span>
+                    <span class="agent-name">Security Agent</span>
+                    <span class="agent-event">Beklemede</span>
+                </div>
+                <div class="agent-item">
+                    <span class="status-dot inactive"></span>
+                    <span class="agent-name">Coding Agent</span>
+                    <span class="agent-event">Beklemede</span>
+                </div>
+                <div class="agent-item">
+                    <span class="status-dot inactive"></span>
+                    <span class="agent-name">Health Agent</span>
+                    <span class="agent-event">Beklemede</span>
+                </div>
+                <div class="agent-item">
+                    <span class="status-dot inactive"></span>
+                    <span class="agent-name">Personal Agent</span>
+                    <span class="agent-event">Beklemede</span>
+                </div>
+                <div class="agent-item">
+                    <span class="status-dot inactive"></span>
+                    <span class="agent-name">Vision Agent</span>
+                    <span class="agent-event">Beklemede</span>
+                </div>
+                <div class="agent-item">
+                    <span class="status-dot inactive"></span>
+                    <span class="agent-name">Smart Home Agent</span>
+                    <span class="agent-event">Beklemede</span>
                 </div>
             </div>
         </section>
 
-        <!-- MERKEZ: HAREKETLİ AI CORE & CAMERA VIEWPORT -->
-        <section class="center-panel">
-            <!-- AI REACTOR -->
-            <div id="ai-core-container">
-                <!-- Glowing central arc reactor core -->
-                <div id="ai-reactor" class="emotion-calm">
-                    <div class="reactor-ring outer-ring"></div>
-                    <div class="reactor-ring middle-ring"></div>
-                    <div class="reactor-ring inner-ring"></div>
-                    <div class="reactor-center">
-                        <i class="fa-solid fa-microchip"></i>
-                    </div>
-                </div>
+        <!-- AI BRAIN -->
+        <section class="card brain-card">
+            <h2 class="card-title">AI Beyin & Router</h2>
+            <div class="info-row">
+                <span>Model Sağlayıcı:</span>
+                <span id="model-provider" class="highlight-cyan">Gemini 3.5</span>
             </div>
-
-            <!-- CAMERA VIEWPORT -->
-            <div id="camera-viewport" class="viewport-hidden">
-                <div class="viewport-header">
-                    <span class="pulse-dot red-dot"></span>
-                    <span class="viewport-title">SİBER GÜVENLİK KAMERASI</span>
-                </div>
-                <div class="viewport-frame">
-                    <img id="hud-camera-feed" src="" alt="Kamera Kapalı">
-                    <div class="scanlines"></div>
-                    <div class="corner-borders"></div>
-                </div>
+            <div class="info-row">
+                <span>Aktif Model:</span>
+                <span id="model-name" class="highlight-purple">gemini-2.5-flash</span>
             </div>
-            
-            <div id="emotion-label">EMPATHY CORE // STANDBY</div>
+            <div class="info-row">
+                <span>Kişilik Modu:</span>
+                <span id="personality-mode" class="highlight-green">Arkadaş Modu</span>
+            </div>
+            <div class="info-row">
+                <span>Self-Improvement Puanı:</span>
+                <span id="improvement-score" class="highlight-orange">94/100</span>
+            </div>
         </section>
 
-        <!-- SAĞ PANEL: TERMİNAL LOGLARI -->
-        <section class="hud-panel right-panel">
-            <div class="panel-header">
-                <i class="fa-solid fa-terminal"></i>
-                <h2>SİSTEM TERMİNALİ</h2>
+        <!-- PLUGINS -->
+        <section class="card plugins-card">
+            <h2 class="card-title">Eklenti Yöneticisi (Plugins)</h2>
+            <div class="plugins-list" id="plugins-container">
+                <!-- Dinamik yüklenecek -->
             </div>
-            <div id="terminal-log" class="terminal-body">
-                <div class="log-line sys-line">SYS: Web HUD bağlantısı kuruluyor...</div>
+        </section>
+
+        <!-- SECURITY AUDIT -->
+        <section class="card security-card">
+            <h2 class="card-title">Güvenlik & Audit Log</h2>
+            <div class="audit-list" id="audit-container">
+                <!-- Audit logları buraya akacak -->
+            </div>
+        </section>
+
+        <!-- MEMORY VIEWER -->
+        <section class="card memory-card">
+            <h2 class="card-title">Uzun Süreli Hafıza (LTM)</h2>
+            <div class="memory-search-box">
+                <input type="text" id="memory-search" placeholder="Hafızada ara...">
+            </div>
+            <div class="memory-list" id="memory-container">
+                <!-- Hafıza kayıtları -->
+            </div>
+        </section>
+
+        <!-- QUICK ACTIONS -->
+        <section class="card quick-actions-card">
+            <h2 class="card-title">Hızlı Komutlar</h2>
+            <div class="btn-grid">
+                <button onclick="sendCommand('morning_brief')">Sabah Raporu</button>
+                <button onclick="sendCommand('take_screenshot')">Ekran Alıntısı</button>
+                <button onclick="sendCommand('toggle_mute')">Sesi Kapat/Aç</button>
+                <button onclick="sendCommand('trigger_face_scan')">Yüz Tanıma</button>
+            </div>
+        </section>
+
+        <!-- LIVE LOGS -->
+        <section class="card logs-card">
+            <h2 class="card-title">Canlı AI Logları</h2>
+            <div class="log-stream" id="log-stream-container">
+                <!-- Loglar akacak -->
             </div>
         </section>
     </main>
-
-    <!-- KONTROL PAD'LERİ (ALT KISIM) -->
-    <section class="control-section">
-        <!-- BÜYÜK HIZLI AKSİYON PADLERİ -->
-        <div class="control-row pads-row">
-            <button onclick="triggerControl('toggle_sentinel')" id="btn-sentinel" class="pad-btn btn-danger">
-                <i class="fa-solid fa-shield-halved"></i>
-                <div class="pad-btn-meta">
-                    <span class="pad-title">SENTINEL MODE</span>
-                    <span id="sentinel-status" class="pad-status">STANDBY</span>
-                </div>
-            </button>
-            <button onclick="triggerControl('toggle_gesture')" id="btn-gesture" class="pad-btn btn-success">
-                <i class="fa-solid fa-hand"></i>
-                <div class="pad-btn-meta">
-                    <span class="pad-title">GESTURE CONTROL</span>
-                    <span id="gesture-status" class="pad-status">STANDBY</span>
-                </div>
-            </button>
-            <button onclick="triggerControl('morning_brief')" class="pad-btn btn-gold">
-                <i class="fa-solid fa-mug-hot"></i>
-                <div class="pad-btn-meta">
-                    <span class="pad-title">SABAH BRİFİNGİ</span>
-                    <span class="pad-status">TETİKLE</span>
-                </div>
-            </button>
-        </div>
-
-        <div class="control-row pads-row">
-            <button onclick="triggerControl('leave_home')" class="pad-btn btn-leave">
-                <i class="fa-solid fa-door-open"></i>
-                <div class="pad-btn-meta">
-                    <span class="pad-title">BEN ÇIKIYORUM</span>
-                    <span class="pad-status">KORUMA ETKİNLEŞTİR</span>
-                </div>
-            </button>
-            <button onclick="triggerControl('return_home')" class="pad-btn btn-return">
-                <i class="fa-solid fa-house-chimney-user"></i>
-                <div class="pad-btn-meta">
-                    <span class="pad-title">BEN GELDİM</span>
-                    <span class="pad-status">EVE DÖNÜŞ BRIEF</span>
-                </div>
-            </button>
-            <button onclick="triggerControl('shutdown')" class="pad-btn btn-shutdown">
-                <i class="fa-solid fa-power-off"></i>
-                <div class="pad-btn-meta">
-                    <span class="pad-title">SİSTEMİ KAPAT</span>
-                    <span class="pad-status">TERMINATE ASSISTANT</span>
-                </div>
-            </button>
-        <!-- ARDUINO / AKILLI EV KONTROLLERİ -->
-        <div class="control-row pads-row">
-            <button onclick="triggerControl('arduino_LED_ON')" class="pad-btn btn-success">
-                <i class="fa-solid fa-lightbulb"></i>
-                <div class="pad-btn-meta">
-                    <span class="pad-title">IŞIKLARI AÇ</span>
-                    <span class="pad-status">ARDUINO: LED_ON</span>
-                </div>
-            </button>
-            <button onclick="triggerControl('arduino_LED_OFF')" class="pad-btn btn-danger">
-                <i class="fa-solid fa-lightbulb"></i>
-                <div class="pad-btn-meta">
-                    <span class="pad-title">IŞIKLARI KAPAT</span>
-                    <span class="pad-status">ARDUINO: LED_OFF</span>
-                </div>
-            </button>
-            <button onclick="triggerControl('arduino_GET_TEMP')" class="pad-btn btn-gold">
-                <i class="fa-solid fa-temperature-half"></i>
-                <div class="pad-btn-meta">
-                    <span class="pad-title">SICAKLIK OKU</span>
-                    <span class="pad-status">ARDUINO: GET_TEMP</span>
-                </div>
-            </button>
-        </div>
-
-        <!-- MEDYA KONTROLLERİ -->
-        <div class="control-row media-row">
-            <button onclick="triggerControl('volume_down')" class="media-btn"><i class="fa-solid fa-volume-low"></i> SES KIS</button>
-            <button onclick="triggerControl('play_pause')" class="media-btn media-play"><i class="fa-solid fa-play"></i> / <i class="fa-solid fa-pause"></i> OYNAT / DURAKLAT</button>
-            <button onclick="triggerControl('volume_up')" class="media-btn"><i class="fa-solid fa-volume-high"></i> SES AÇ</button>
-        </div>
-    </section>
-
-    <!-- ALT BİLGİ VE TEXT KOMUT GİRİŞİ -->
-    <footer class="hud-footer">
-        <div class="chat-input-container">
-            <input type="text" id="cmd-input" placeholder="F.R.I.D.A.Y.'e metin komutu gönderin..." onkeydown="handleInputKey(event)">
-            <button onclick="sendCommand()" class="chat-send-btn"><i class="fa-solid fa-paper-plane"></i> GÖNDER</button>
-        </div>
-    </footer>
-
-    <!-- REMOTE MIC MODULE (WEB SPEECH) -->
-    <div class="mic-container">
-        <button id="btn-mic" onclick="toggleRemoteMic()" class="mic-btn">
-            <i class="fa-solid fa-microphone"></i>
-        </button>
-        <span class="mic-tooltip">UZAKTAN SESLİ KOMUT</span>
-    </div>
 
     <script src="hud.js"></script>
 </body>
