@@ -72,6 +72,31 @@ THEMES = {
             "INITIALISING": (239, 68, 68),
         },
     },
+    "nexus": {
+        "C_BG":     "#050814", # Koyu Gece Mavisi
+        "C_PRI":    "#bd00ff", # Neon Violet
+        "C_ORG":    "#00e5ff", # Neon Cyan
+        "C_ORG2":   "#ff0055", # Hot Pink
+        "C_MID":    "#151b30", # Koyu Mavi Çerçeve
+        "C_DIM":    "#0d1326", # Slate / Mavi Tonu
+        "C_DIMMER": "#080c1b", # Çok Koyu Panel
+        "C_TEXT":   "#ffffff", # Saf Beyaz
+        "C_PANEL":  "#080c1b", # Panel Arkaplanı
+        "C_GREEN":  "#00ff88", # Cyberpunk Yeşil
+        "C_RED":    "#ff2d55", # Cyberpunk Kırmızı
+        "C_MUTED":  "#5b6e9c", # Muted Mavi-Slate
+        "C_BLUE":   "#00a2ff", # Parlak Mavi
+        "C_GOLD":   "#ffbb00", # Altın
+        "ORB_COLORS": {
+            "LISTENING":    (0, 229, 255), # Neon Cyan
+            "SPEAKING":     (189, 0, 255), # Neon Violet
+            "THINKING":     (255, 0, 85), # Hot Pink
+            "MUTED":        (91, 110, 156),
+            "PAUSED":       (13, 19, 38),
+            "ERROR":        (255, 45, 85),
+            "INITIALISING": (255, 45, 85),
+        },
+    },
 }
 
 def _load_theme_globals(theme_name: str):
@@ -869,13 +894,24 @@ class JarvisUI:
         BH = int(c["height"])
         c.delete("all")
         c.configure(bg=C_BG)
-        is_light = self._theme_name == "light"
-        col  = C_GOLD if is_light else C_PRI
-        icon = "⚆ NEON" if is_light else "☾ DARK"
+        if self._theme_name == "light":
+            icon = "⚆ LIGHT"
+            col = C_GOLD
+        elif self._theme_name == "dark":
+            icon = "☾ DARK"
+            col = C_PRI
+        else:
+            icon = "⚡ NEXUS"
+            col = C_ORG
         c.create_text(BW//2, BH//2, text=icon, fill=col, font=font_body_bold(10))
 
     def _toggle_theme(self):
-        self._theme_name = "light" if self._theme_name == "dark" else "dark"
+        if self._theme_name == "light":
+            self._theme_name = "dark"
+        elif self._theme_name == "dark":
+            self._theme_name = "nexus"
+        else:
+            self._theme_name = "light"
         _load_theme_globals(self._theme_name)
         self._apply_theme_widgets()
         self._draw_theme_button()
@@ -931,7 +967,13 @@ class JarvisUI:
                     cv.configure(bg=C_BG)
 
             # Settings panel
-            panel_bg = "#041111" if self._theme_name == "dark" else "#e8f4f2"
+            if self._theme_name == "nexus":
+                panel_bg = "#080c1b"
+            elif self._theme_name == "dark":
+                panel_bg = "#041111"
+            else:
+                panel_bg = "#e8f4f2"
+                
             self._settings_panel.configure(bg=panel_bg, highlightbackground=C_MID)
             self._settings_title.configure(fg=C_PRI, bg=panel_bg)
             self._settings_body.configure(bg=panel_bg)
@@ -948,7 +990,13 @@ class JarvisUI:
                                                activeforeground=C_BG, activebackground=C_PRI)
 
             # Debug text
-            debug_bg = "#020a0a" if self._theme_name == "dark" else "#e0f0f0"
+            if self._theme_name == "nexus":
+                debug_bg = "#040814"
+            elif self._theme_name == "dark":
+                debug_bg = "#020a0a"
+            else:
+                debug_bg = "#e0f0f0"
+                
             self._debug_text.configure(fg=C_TEXT, bg=debug_bg, highlightbackground=C_DIM)
             self._debug_text.tag_config("info", foreground=C_TEXT)
             self._debug_text.tag_config("warn", foreground=C_GOLD)
