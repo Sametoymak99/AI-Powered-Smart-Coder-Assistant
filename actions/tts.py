@@ -1,19 +1,34 @@
 """
-TTS (Text-to-Speech) — macOS built-in 'say' komutu kullanır.
-Ek kurulum gerektirmez, Türkçe ve İngilizce destekler.
-Alp Ünlü tarafından yapılmıştır — @alppunlu
+TTS (Text-to-Speech) — Cross-platform support
+On Windows: Uses SAPI (Speech API) via comtypes.
+On macOS: Uses the built-in 'say' command.
+On Linux: Uses 'espeak'.
 """
 
+import sys
+import os
 import subprocess
 import threading
+import logging
+from typing import Callable, Optional
 
+logger = logging.getLogger("TTS")
 
-# macOS'taki Türkçe ses: 'Yelda' (macOS 13+) veya 'Zoe' (İngilizce)
-# Kullanılabilir sesleri görmek için: say -v ?
-VOICE = "Yelda"    # Türkçe yoksa "Zoe" veya "Samantha" kullanılır
+# Windows SAPI Setup
+_voice = None
+if sys.platform == "win32":
+    try:
+        import comtypes.client
+        # Initialize COM library for the thread if not initialized
+        try:
+            comtypes.CoInitialize()
+        except Exception:
+            pass
+        _voice = comtypes.client.CreateObject("SAPI.SpVoice")
+    except Exception as e:
+        logger.error(f"Failed to initialize SAPI SpVoice on Windows: {e}")
 
-
-def speak_text(text: str, on_done=None, blocking: bool = False):
+def speak_text(text: str, on_done: Optional[Callable[[], None]] = None, blocking: bool = False):
     """
     Metni sesli olarak okur.
     on_done: okuma bitince çağrılacak fonksiyon (opsiyonel)
@@ -24,35 +39,58 @@ def speak_text(text: str, on_done=None, blocking: bool = False):
             on_done()
         return
 
-    # Çok uzun metinleri kısalt (TTS için)
+    # Çok uzun metinleri kısalt
     max_len = 500
     if len(text) > max_len:
         text = text[:max_len] + "..."
 
     def _run():
-        try:
-            subprocess.run(["say", "-v", VOICE, text], check=False)
-        except FileNotFoundError:
-            # 'say' bulunamazsa sessiz geç
-            pass
+        if sys.platform == "win32" and _voice:
+            try:
+                # Initialize COM for the background thread
+                try:
+                    comtypes.CoInitialize()
+                except Exception:
+                    pass
+                # SAPI SpVoice Speak flags: 0 is default (synchronous), 1 is asynchronous
+                # We can run synchronously in this thread since it's already a background thread
+                _voice.Speak(text)
+            except Exception as e:
+                logger.error(f"SAPI speak failed: {e}")
+        elif sys.platform == "darwin":
+            try:
+                subprocess.run(["say", text], check=False)
+            except Exception as e:
+                logger.error(f"macOS say command failed: {e}")
+        else:
+            try:
+                subprocess.run(["espeak", text], check=False)
+            except Exception as e:
+                logger.error(f"Linux espeak command failed: {e}")
+                
         if on_done:
             on_done()
 
     if blocking:
         _run()
     else:
-        threading.Thread(target=_run, daemon=True).start()
-
+        threading.Thread(target=_run, name="TTS-Thread", daemon=True).start()
 
 def get_available_voices() -> list[str]:
-    """macOS'taki mevcut sesleri listeler."""
-    try:
-        result = subprocess.run(["say", "-v", "?"],
-                                capture_output=True, text=True)
-        voices = []
-        for line in result.stdout.splitlines():
-            if line.strip():
-                voices.append(line.split()[0])
-        return voices
-    except Exception:
-        return []
+    """Mevcut sistem seslerini listeler."""
+    voices = []
+    if sys.platform == "win32" and _voice:
+        try:
+            for v in _voice.GetVoices():
+                voices.append(v.GetDescription())
+        except Exception:
+            pass
+    elif sys.platform == "darwin":
+        try:
+            result = subprocess.run(["say", "-v", "?"], capture_output=True, text=True)
+            for line in result.stdout.splitlines():
+                if line.strip():
+                    voices.append(line.split()[0])
+        except Exception:
+            pass
+    return voices

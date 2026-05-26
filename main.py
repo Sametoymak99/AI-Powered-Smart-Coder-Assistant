@@ -1856,6 +1856,19 @@ class JarvisLive:
     def _on_text_command(self, text: str):
         if self._paused:
             return
+        
+        # Check personality mode change command
+        new_mode = personality_system.detect_mode_from_text(text)
+        if new_mode:
+            res_msg = personality_system.set_mode(new_mode)
+            self.ui.write_log(f"SYS: {res_msg}")
+            try:
+                from actions.tts import speak_text
+                speak_text(personality_system.PERSONALITY_MODES[new_mode]["greeting"])
+            except Exception:
+                pass
+            return
+
         self.ui.write_log(f"Siz: {text}")
         if not self._loop or not self.session:
             self.ui.write_log("ERR: F.R.I.D.A.Y bağlantısı henüz hazır değil.")
@@ -2344,6 +2357,14 @@ class JarvisLive:
             elif name == "execute_task_plan":
                 # Tool executor: senkron tool çağrısı
                 def _sync_tool_executor(tool_name: str, action: str, tool_args: dict) -> str:
+                    # Check plugin handlers
+                    handlers = plugin_loader.get_all_handlers()
+                    if tool_name in handlers:
+                        try:
+                            return str(handlers[tool_name](**tool_args))
+                        except Exception as e:
+                            return f"Eklenti hatası: {e}"
+
                     import importlib
                     dispatchers = {
                         "file_manager": lambda: file_manager(action, **tool_args),
@@ -2354,10 +2375,19 @@ class JarvisLive:
                             tool_args.get("url"),
                             tool_args.get("query")
                         ),
+                        "open_app":     lambda: open_app(tool_args.get("app_name", "")),
+                        "kill_app":     lambda: kill_app(tool_args.get("app_name", "")),
+                        "set_volume":   lambda: set_volume(tool_args.get("level", 50)),
+                        "set_brightness": lambda: set_brightness(tool_args.get("level", 50)),
+                        "set_timer":    lambda: set_timer(tool_args.get("minutes", 0), tool_args.get("seconds", 0), tool_args.get("label", "")),
+                        "set_alarm":    lambda: set_alarm(tool_args.get("time_str", ""), tool_args.get("label", ""))
                     }
                     fn = dispatchers.get(tool_name)
                     if fn:
-                        return str(fn())
+                        try:
+                            return str(fn())
+                        except Exception as e:
+                            return f"Hata: {e}"
                     return f"Bilinmeyen araç: {tool_name}"
 
                 r = await loop.run_in_executor(
